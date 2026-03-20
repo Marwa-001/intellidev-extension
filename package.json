@@ -1,0 +1,112 @@
+{
+  "name": "intellidev",
+  "displayName": "IntelliDev",
+  "description": "Privacy-preserving cognitive load detection for developers",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "intellidev-container",
+          "title": "IntelliDev",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "views": {
+      "intellidev-container": [
+        {
+          "type": "webview",
+          "id": "intellidev.dashboard",
+          "name": "Cognitive Load",
+          "icon": "$(pulse)",
+          "contextualTitle": "IntelliDev — Cognitive Load"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "intellidev.openDashboard",
+        "title": "IntelliDev: Open Dashboard",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "intellidev.refreshDashboard",
+        "title": "IntelliDev: Refresh Dashboard",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "intellidev.showDashboard",
+        "title": "IntelliDev: Show Session Log"
+      },
+      {
+        "command": "intellidev.pauseTracking",
+        "title": "IntelliDev: Pause Tracking",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "intellidev.resumeTracking",
+        "title": "IntelliDev: Resume Tracking",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "intellidev.getSnapshot",
+        "title": "IntelliDev: Get Snapshot"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "intellidev.refreshDashboard",
+          "when": "view == intellidev.dashboard",
+          "group": "navigation@1"
+        },
+        {
+          "command": "intellidev.pauseTracking",
+          "when": "view == intellidev.dashboard && !intellidev.paused",
+          "group": "navigation@2"
+        },
+        {
+          "command": "intellidev.resumeTracking",
+          "when": "view == intellidev.dashboard && intellidev.paused",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "IntelliDev",
+      "properties": {
+        "intellidev.alertThreshold": {
+          "type": "number",
+          "default": 60,
+          "description": "Cognitive load score threshold for alerts (0-100)"
+        },
+        "intellidev.dataPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the intellidev data folder (e.g. D:\\intellidev\\data\\sessions). The dashboard reads feature and alert files relative to this path's parent."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}
