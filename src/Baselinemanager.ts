@@ -59,8 +59,8 @@ export type DeleteResult = { success: boolean; message: string };
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Change back to MIN_SESSIONS=10, MIN_HOURS=10 before publishing ────────────
-const MIN_SESSIONS   = 3;    // production: 10
-const MIN_HOURS      = 0;    // production: 10
+const MIN_SESSIONS   = 10;    // production: 10
+const MIN_HOURS      = 10;    // production: 10
 
 const RETENTION_DAYS = 90;
 const DRIFT_EVERY    = 30;

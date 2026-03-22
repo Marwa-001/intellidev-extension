@@ -1,12 +1,32 @@
 {
   "name": "intellidev",
   "displayName": "IntelliDev",
-  "description": "Privacy-preserving cognitive load detection for developers",
+  "description": "Privacy-preserving cognitive load detection for developers — real-time scoring, personal baseline, and in-editor alerts.",
   "version": "0.1.0",
+  "publisher": "marwa-zara",
+  "icon": "images/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Marwa-001/intellidev-extension"
+  },
+  "homepage": "https://github.com/Marwa-001/intellidev-extension#readme",
+  "keywords": [
+    "cognitive load",
+    "developer wellness",
+    "productivity",
+    "focus",
+    "burnout",
+    "telemetry",
+    "wellbeing"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other",
+    "Productivity"
+  ],
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
@@ -85,12 +105,12 @@
         "intellidev.alertThreshold": {
           "type": "number",
           "default": 60,
-          "description": "Cognitive load score threshold for alerts (0-100)"
+          "description": "Cognitive load score threshold for alerts (0-100). Alerts fire when your score reaches or exceeds this value."
         },
         "intellidev.dataPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the intellidev data folder (e.g. D:\\intellidev\\data\\sessions). The dashboard reads feature and alert files relative to this path's parent."
+          "description": "Absolute path to the folder where IntelliDev stores session files (e.g. D:\\intellidev\\data\\sessions). Leave empty to use the default VS Code global storage location."
         }
       }
     }
