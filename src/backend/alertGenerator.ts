@@ -1,7 +1,7 @@
 /**
  * alertGenerator.ts
  * Mirrors Python backend/inference_engine/alerts.py
- * Builds contextual alert messages and enforces cooldowns.
+ * Builds contextual alert messages and enforces cooldowns
  */
 
 import type { ScoringResult } from './scorer';
