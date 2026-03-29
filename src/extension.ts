@@ -51,12 +51,7 @@ function resolveDataPaths(context: vscode.ExtensionContext): {
   if (customPath && customPath.length > 0) {
     sessionsDir = customPath;
   } else {
-    const wf = vscode.workspace.workspaceFolders;
-    if (wf && wf.length > 0) {
-      sessionsDir = path.join(wf[0].uri.fsPath, 'data', 'sessions');
-    } else {
-      sessionsDir = path.join(context.globalStorageUri.fsPath, 'sessions');
-    }
+    sessionsDir = path.join(context.globalStorageUri.fsPath, 'sessions');
   }
 
   const dataDir     = path.dirname(sessionsDir);

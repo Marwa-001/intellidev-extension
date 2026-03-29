@@ -4,6 +4,11 @@ All notable changes to IntelliDev will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.4] — 2026-03-29
+
+### Fixed
+- Session data is now stored in VS Code's private global storage (`globalStorageUri`) instead of the currently opened workspace folder — data no longer appears as a `data/` folder inside the user's project and cannot accidentally be committed to Git
+
 ## [0.1.3] — 2026-03-28
 
 ### Fixed

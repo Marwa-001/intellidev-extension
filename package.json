@@ -2,7 +2,7 @@
   "name": "intellidev",
   "displayName": "IntelliDev",
   "description": "Privacy-preserving cognitive load detection for developers — real-time scoring, personal baseline, and in-editor alerts.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "marwa-zara",
   "icon": "images/icon.png",
   "license": "MIT",
