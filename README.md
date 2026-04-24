@@ -1,118 +1,187 @@
-# IntelliDev 🧠
+<div align="center">
 
-> **Know when to take a break before burnout takes you.**
+<br/>
 
-IntelliDev watches how you code, not what you code, and tells you when your cognitive load is getting dangerously high. It lives entirely inside VS Code. No accounts, no cloud, no code ever leaves your machine.
+```
+██╗███╗   ██╗████████╗███████╗██╗     ██╗     ██╗██████╗ ███████╗██╗   ██╗
+██║████╗  ██║╚══██╔══╝██╔════╝██║     ██║     ██║██╔══██╗██╔════╝██║   ██║
+██║██╔██╗ ██║   ██║   █████╗  ██║     ██║     ██║██║  ██║█████╗  ██║   ██║
+██║██║╚██╗██║   ██║   ██╔══╝  ██║     ██║     ██║██║  ██║██╔══╝  ╚██╗ ██╔╝
+██║██║ ╚████║   ██║   ███████╗███████╗███████╗██║██████╔╝███████╗ ╚████╔╝ 
+╚═╝╚═╝  ╚═══╝   ╚═╝   ╚══════╝╚══════╝╚══════╝╚═╝╚═════╝ ╚══════╝  ╚═══╝  
+```
 
-&nbsp;
+**Know when to take a break — before burnout takes you.**
 
-## How It Works
+<br/>
 
-While you work, IntelliDev silently measures four things:
+[![Version](https://img.shields.io/badge/version-0.1.4-00B4D8?style=flat-square&labelColor=0D1117)](https://github.com/Marwa-001/intellidev-extension)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85-007ACC?style=flat-square&labelColor=0D1117&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/vscode)
+[![License](https://img.shields.io/badge/license-MIT-1ABC9C?style=flat-square&labelColor=0D1117)](LICENSE)
+[![Privacy](https://img.shields.io/badge/privacy-100%25%20local-FF4B7D?style=flat-square&labelColor=0D1117)]()
 
-🎹 **Typing Patterns** — rhythm, variability, backspace rate, pauses
+<br/>
 
-⚠️ **Errors** — how often compilation errors spike and how long they last
+</div>
 
-🔀 **Context Switching** — how rapidly you jump between files
+---
 
-⏱️ **Session Length** — how long you have been coding and how much of that is deep work vs idle
+## What is IntelliDev?
 
-Every session produces a **cognitive load score from 0 to 100**. When that score gets too high, you get a notification inside VS Code telling you to take a break, with context about why.
+IntelliDev is a VS Code extension that watches **how** you code, not **what** you code. It silently measures your typing rhythm, error frequency, context switching, and session length — then translates those signals into a real-time **cognitive load score**. When that score gets dangerously high, it tells you to stop before you burn out.
 
-&nbsp;
+Everything runs locally. No accounts. No cloud. Your code never leaves your machine.
 
-## Score Levels
+---
 
-| Score | Status | What To Do |
-|-------|--------|------------|
-| 0 to 29 | 🟢 Stable Focus | You are in flow. Keep going. |
-| 30 to 59 | 🟡 Mild Strain | Consider a short break. |
-| 60 to 79 | 🟠 High Cognitive Load | Take a 10 to 15 minute break. |
-| 80 to 100 | 🔴 Burnout Risk | Stop coding. Rest for 30+ minutes. |
+## How it works
 
-&nbsp;
+Every few seconds, IntelliDev samples four behavioral dimensions:
 
-## Personal Baseline
+| Signal | What it measures |
+|--------|-----------------|
+| 🎹 **Typing patterns** | Rhythm, variability, backspace rate, and pauses |
+| ⚠️ **Errors** | How often compilation errors spike and how long they persist |
+| 🔀 **Context switching** | How rapidly you jump between files |
+| ⏱️ **Session length** | Total time coded and how much of it is deep work vs. idle |
 
-After 10 sessions (10+ hours of coding), IntelliDev locks a **personal baseline** calibrated to your individual patterns. From that point, scores are relative to **your** norm — so a naturally fast typer won't be penalised for high KPM, and someone who prefers working late won't get flagged unfairly.
+These signals feed a **20-rule scoring engine** across all four categories. The result is a cognitive load score from 0 to 100, updated continuously.
 
-The baseline automatically recalibrates every 30 sessions as your patterns evolve.
+---
 
-&nbsp;
+## Score levels
+
+| Score | Status | What to do |
+|-------|--------|-----------|
+| **0 – 29** | 🟢 Stable Focus | You're in flow. Keep going. |
+| **30 – 59** | 🟡 Mild Strain | Consider a short break. |
+| **60 – 79** | 🟠 High Cognitive Load | Take a 10–15 minute break. Step away. |
+| **80 – 100** | 🔴 Burnout Risk | Stop coding. Rest for 30+ minutes. |
+
+---
+
+## Personal baseline
+
+> Generic thresholds punish fast typers and night owls equally. IntelliDev doesn't.
+
+After **10 sessions** (10+ hours of coding), IntelliDev locks a **personal baseline** calibrated to your individual patterns using Pearson z-scores. From that point, every score is relative to *your* norm:
+
+- A naturally fast typer won't be penalised for high KPM
+- Someone who codes late won't get flagged unfairly for night sessions
+- The baseline **auto-recalibrates every 30 sessions** as your patterns evolve
+
+During calibration, scores shown are rule-based estimates. The banner in the dashboard shows exactly how far along calibration is.
+
+---
 
 ## Dashboard
 
-Open the IntelliDev panel from the activity bar to see everything at a glance:
+Open the IntelliDev panel from the activity bar to see your full picture at a glance.
 
-| Panel | What It Shows |
+| Panel | What it shows |
 |-------|--------------|
-| 📊 Live Gauge | Your current cognitive load score in real time |
-| 📈 Score Trend | Score history across all your sessions |
-| 🧩 Category Breakdown | Typing, errors, context, and session contributions |
-| 🔴 Error Density | Error rate spikes and peaks over time |
-| 🔀 Context Switching | File switch frequency and rapid switch patterns |
-| 🎯 Deep Work vs Idle | Focus blocks compared to idle time per session |
-| 🗓️ Heatmap | Cognitive load patterns by time of day |
-| 📅 Weekly and Monthly | Period comparisons with changes highlighted |
-| 🔔 Alert History | Full log of every alert generated |
+| 📊 **Live gauge** | Current cognitive load score in real time |
+| 📈 **Score trend** | Score history across all sessions |
+| 🧩 **Category breakdown** | Typing, errors, context, and session contributions |
+| 🔴 **Error density** | Error rate spikes and peaks over time |
+| 🔀 **Context switching** | File switch frequency and rapid-switch patterns |
+| 🎯 **Deep work vs. idle** | Focus blocks compared to idle time per session |
+| 🗓️ **Heatmap** | Cognitive load patterns by time of day |
+| 📅 **Weekly & monthly** | Period comparisons with changes highlighted |
+| 🔔 **Alert history** | Full log of every alert generated |
 
-&nbsp;
+---
 
 ## Alerts
 
 IntelliDev fires VS Code notifications when:
 
 - Your score reaches **60+** — overload warning
-- Your score reaches **80+** — burnout risk shown as an error notification
-- You have been coding for **2+ hours** without a meaningful break
-- You have been coding **late at night** for more than 15 minutes
+- Your score reaches **80+** — burnout risk (shown as an error notification)
+- You've been coding for **2+ hours** without a meaningful break
+- You've been coding **late at night** for more than 15 minutes
 
-Alerts have a **5 minute cooldown** so they never spam you.
+All alerts have a **5-minute cooldown** so they never spam you. Night alerts use a separate **30-minute cooldown** — because nobody wants to be interrupted every five minutes at 11 pm.
 
-&nbsp;
+---
 
-## Privacy First
+## Privacy
 
-IntelliDev was designed from the ground up with privacy as a hard constraint, not an afterthought.
+IntelliDev was built from the ground up with privacy as a hard constraint, not an afterthought.
 
-✅ **Cannot read your code** — the VS Code API used (`onDidChangeTextDocument`) provides typing metadata only. It is technically incapable of capturing source code content.
+**✅ Cannot read your code**
+The VS Code API used (`onDidChangeTextDocument`) provides typing metadata only. It is technically incapable of capturing source code content.
 
-✅ **No filenames or snippets** — session files contain only numbers. No file names, no code, no personal information.
+**✅ No filenames or snippets stored**
+Session files contain only numbers — no file names, no code, no personal information.
 
-✅ **Fully local** — everything runs inside VS Code. No external servers, no network calls, no background processes.
+**✅ Fully local**
+Everything runs inside VS Code. No external servers, no network calls, no background processes.
 
-✅ **Auto cleanup** — session files older than 90 days are automatically deleted.
+**✅ Auto cleanup**
+Session files older than 90 days are automatically deleted.
 
-&nbsp;
+---
 
 ## Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `intellidev.alertThreshold` | `60` | Score threshold for overload alerts |
-| `intellidev.dataPath` | *(empty)* | Custom path for session storage. Leave empty to use VS Code default storage. |
-
-&nbsp;
-
-## Pause Tracking
-
-Click the **pause button** in the IntelliDev sidebar title bar to stop tracking during a meeting or break. Click play to resume. The status bar reflects the current state at all times.
-
-&nbsp;
-
-## Data Management
-
-Inside the dashboard, the **Data Management** panel lets you:
-
-🔄 **Reset Baseline Only** — wipe the calibration and start fresh while keeping session history
-
-🗑️ **Delete All Session Data** — removes all local files and resets calibration
-
-💥 **Full Wipe** — deletes everything and generates a new anonymous identity
-
-&nbsp;
+| `intellidev.alertThreshold` | `60` | Score threshold for overload alerts (0–100) |
+| `intellidev.dataPath` | *(empty)* | Custom path for session storage. Leave empty to use VS Code's default global storage. |
 
 ---
 
+## Pause tracking
+
+Click the **pause button** in the IntelliDev sidebar title bar to stop tracking during a meeting or break. Click play to resume. The status bar always reflects the current state.
+
+---
+
+## Data management
+
+Inside the dashboard, the **Data Management** panel gives you full control:
+
+| Action | What it does |
+|--------|-------------|
+| 🔄 **Reset baseline only** | Wipes the calibration and restarts it — keeps all session history |
+| 🗑️ **Delete all session data** | Removes all local files and resets calibration |
+| 💥 **Full wipe** | Deletes everything and generates a new anonymous identity |
+
+All actions require confirmation. All data is stored locally — there is nothing to contact or revoke on a server.
+
+---
+
+## Installation
+
+Search for **IntelliDev** in the VS Code Extension Marketplace, or install from the [GitHub repository](https://github.com/Marwa-001/intellidev-extension).
+
+IntelliDev requires **VS Code 1.85** or later. No additional dependencies or runtimes needed — everything is bundled.
+
+---
+
+## Changelog highlights
+
+**v0.1.4** — Session data now stored in VS Code's private global storage, so it no longer appears as a `data/` folder inside your project and can't accidentally be committed to Git.
+
+**v0.1.3** — Alert timestamps now correctly reflect local timezone on all platforms, including Windows machines where the extension host previously defaulted to UTC.
+
+**v0.1.0** — Initial release: real-time telemetry across 18 behavioral signals, rule-based scoring engine, personal baseline calibration, live dashboard, and alert system.
+
+Full changelog: [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+<div align="center">
+
+<br/>
+
 *Built with care by Zara and Marwa*
+
+<br/>
+
+[GitHub](https://github.com/Marwa-001/intellidev-extension) · [Report a bug](https://github.com/Marwa-001/intellidev-extension/issues) · [Request a feature](https://github.com/Marwa-001/intellidev-extension/issues)
+
+<br/>
+
+</div>
