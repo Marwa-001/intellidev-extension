@@ -1,35 +1,19 @@
-/**
- * dashboardProvider.ts
- *
- * Key changes vs original:
- *  - Removed _computeRawScore, _typingScore, _errorScore, _contextScore,
- *    _sessionScore — these duplicated scorer.ts and could drift out of sync.
- *    Scores are now written by backendEngine into the features JSON and read
- *    directly here. Falls back to 0 if the field is absent (old session files).
- *  - Removed the alertsDir path from the "no alerts" user-facing message.
- *  - Constructor accepts dataDir resolved once in extension.ts (unchanged).
- */
-
 import * as vscode from 'vscode';
 import * as fs     from 'fs';
 import * as path   from 'path';
 import { BaselineManager, FeatureMetrics, ScoredSession } from './Baselinemanager';
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Interfaces
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface FeatureData extends FeatureMetrics {
   session_id?:           string;
   datetime?:             string;
-  // Score fields written by backendEngine — no recomputation in dashboard
   cognitive_score?:      number;
   score_label?:          string;
   typing_score?:         number;
   error_score?:          number;
   context_score?:        number;
   session_score?:        number;
-  // Baseline fields added by dashboard after loading
   baseline_score?:       number | null;
   baseline_label?:       string | null;
   deviation_summary?:    string | null;
@@ -59,9 +43,7 @@ interface PeriodStats {
   totalHours:   number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Provider
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellidev.dashboard';
@@ -82,8 +64,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     this._alertsDir   = path.join(dataDir, 'alerts');
     this._baseline.setFeaturesDir(this._featuresDir);
   }
-
-  // ── WebviewViewProvider ────────────────────────────────────────────────────
 
   resolveWebviewView(
     webviewView:  vscode.WebviewView,
@@ -116,11 +96,7 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  // ── Public ─────────────────────────────────────────────────────────────────
-
   public refresh(): void { this._sendData(); }
-
-  // ── Delete handler ─────────────────────────────────────────────────────────
 
   private _handleDelete(type: 'sessions' | 'baseline' | 'full'): void {
     let result;
@@ -139,8 +115,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     }
     this._sendData();
   }
-
-  // ── Period aggregation ─────────────────────────────────────────────────────
 
   private _buildPeriodStats(features: FeatureData[]): {
     weekly: PeriodStats[]; monthly: PeriodStats[];
@@ -196,8 +170,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     };
   }
 
-  // ── Data loading ───────────────────────────────────────────────────────────
-
   private _loadFeatures(): FeatureData[] {
     if (!fs.existsSync(this._featuresDir)) { return []; }
 
@@ -216,7 +188,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
           const sid     = file.replace('_features.json', '');
           data.session_id = sid;
 
-          // Parse datetime from session_YYYYMMDD_HHMMSS
           try {
             const p         = sid.replace('session_', '');
             const [dp, tp]  = p.split('_');
@@ -232,11 +203,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
             data.datetime = new Date().toISOString();
           }
 
-          // ── Use scores written by backendEngine ──────────────────────────
-          // Fields cognitive_score, score_label, typing_score, error_score,
-          // context_score, session_score are written by backendEngine.ts.
-          // For old session files that predate this change, fall back to 0
-          // so the dashboard doesn't crash.
           if (data.cognitive_score === undefined) { data.cognitive_score = 0; }
           if (data.score_label     === undefined) { data.score_label     = this._rawLabel(0); }
           if (data.typing_score    === undefined) { data.typing_score    = 0; }
@@ -249,7 +215,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
       }
     } catch { /* directory not readable */ }
 
-    // Update calibration counters
     const totalHours = raw.reduce(
       (a, f) => a + (f.session_duration_minutes ?? 0) / 60, 0
     );
@@ -318,16 +283,12 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     return results.slice(-20);
   }
 
-  // ── Small helper — only used for fallback label on old session files ────────
-
   private _rawLabel(s: number): string {
     if (s < 30) { return 'Stable Focus'; }
     if (s < 60) { return 'Mild Strain'; }
     if (s < 80) { return 'High Load'; }
     return 'Burnout Risk';
   }
-
-  // ── Send data to webview ───────────────────────────────────────────────────
 
   private _sendData(): void {
     if (!this._view) { return; }
@@ -356,8 +317,6 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  // ── HTML ───────────────────────────────────────────────────────────────────
-
   private _getHtmlContent(_webview: vscode.Webview): string {
     const nonce = getNonce();
     return `<!DOCTYPE html>
@@ -382,8 +341,20 @@ body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:v
 .empty .ico{font-size:32px;margin-bottom:10px}
 .empty p{font-size:11px;line-height:1.7}
 
-.sec{padding:12px 12px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--teal);display:flex;align-items:center;gap:8px}
+/* Section headers with info button */
+.sec{padding:12px 12px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:var(--teal);display:flex;align-items:center;gap:8px;position:relative}
 .sec::after{content:'';flex:1;height:1px;background:var(--border)}
+.info-btn{background:none;border:1px solid rgba(0,180,216,.35);color:rgba(0,180,216,.7);border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;line-height:1;padding:0;font-weight:700}
+.info-btn:hover{background:rgba(0,180,216,.15);color:var(--teal);border-color:var(--teal)}
+
+/* Info popover */
+.info-pop{display:none;position:relative;margin:0 10px 6px;padding:9px 11px;background:rgba(0,20,30,.92);border:1px solid rgba(0,180,216,.3);border-radius:6px;font-size:10px;color:#C9D1D9;line-height:1.65;z-index:10}
+.info-pop.show{display:block}
+.info-pop strong{color:var(--teal)}
+.info-pop .thresholds{margin-top:6px;display:flex;flex-direction:column;gap:2px}
+.info-pop .trow{display:flex;align-items:center;gap:6px;font-size:9px}
+.info-pop .tdot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.info-pop .tval{color:#8B949E}
 
 .calib-banner{margin:8px 10px 4px;padding:10px 12px;border-radius:6px;background:rgba(0,180,216,.08);border:1px solid rgba(0,180,216,.25);border-left:3px solid var(--teal)}
 .calib-title{font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
@@ -393,6 +364,9 @@ body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:v
 .calib-pct{font-size:9px;color:var(--teal);text-align:right;margin-top:3px}
 
 .baseline-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(26,188,156,.15);border:1px solid rgba(26,188,156,.35);font-size:9px;color:var(--green);font-weight:600;margin:0 10px 6px;text-transform:uppercase;letter-spacing:.07em}
+
+/* Reading-mode chip */
+.reading-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(0,180,216,.1);border:1px solid rgba(0,180,216,.3);font-size:9px;color:var(--teal);font-weight:600;margin:0 10px 6px}
 
 .mcards{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:0 10px 6px}
 .mc{background:var(--vscode-editor-background,#161B22);border:1px solid var(--border);border-radius:6px;padding:8px 10px;position:relative;overflow:hidden}
@@ -502,6 +476,98 @@ function mkCtx(id, h){
   ctx._w=w; ctx._h=h; return ctx;
 }
 
+// ── Info popover toggle ───────────────────────────────────────────────────────
+function toggleInfo(id) {
+  const pop = document.getElementById('info-' + id);
+  if (!pop) { return; }
+  // Close all others first
+  document.querySelectorAll('.info-pop.show').forEach(el => {
+    if (el.id !== 'info-' + id) { el.classList.remove('show'); }
+  });
+  pop.classList.toggle('show');
+}
+
+// ── Chart info definitions ────────────────────────────────────────────────────
+// Each entry: { id, title, body, thresholds? }
+const CHART_INFO = {
+  trend: {
+    title: 'Score Trend',
+    body: 'Each dot is one session. The score (0–100) measures cognitive strain based on your typing rhythm, error count, file switching, and session length. Lower is better.',
+    thresholds: [
+      { color:'#1ABC9C', label:'0–29', desc:'Stable Focus — you\'re in flow' },
+      { color:'#F39C12', label:'30–59', desc:'Mild Strain — consider a break' },
+      { color:'#FF8C42', label:'60–79', desc:'High Load — take 10–15 min off' },
+      { color:'#FF4B7D', label:'80+',   desc:'Burnout Risk — rest now' },
+    ]
+  },
+  break: {
+    title: 'Score Breakdown',
+    body: 'Each session bar is split into four stacked categories. Taller bars = more strain from that category. Use this to spot patterns — e.g. if Error is always tall, you may need to slow down and test more often.',
+    thresholds: [
+      { color:'#00B4D8', label:'Typing',  desc:'Rhythm, variability, backspaces, pauses' },
+      { color:'#FF4B7D', label:'Errors',  desc:'Compile errors, debug sessions, bursts' },
+      { color:'#F39C12', label:'Context', desc:'File switches per 10 min window' },
+      { color:'#FF8C42', label:'Session', desc:'Duration, idle ratio, night coding' },
+    ]
+  },
+  err: {
+    title: 'Error Density',
+    body: 'Shows compilation/linter errors per 10-minute window across your session history. The yellow dashed line marks the threshold (5 errors/window) where the scoring engine starts adding load points.',
+    thresholds: [
+      { color:'#FF4B7D', label:'Avg rate', desc:'Mean errors per 10-min window' },
+      { color:'#FF8C42', label:'Peak rate', desc:'Highest error count seen in any window' },
+      { color:'#F39C12', label:'Threshold line (5)', desc:'Above this = high_error_rate rule fires (+15 pts)' },
+    ]
+  },
+  ctx: {
+    title: 'Context Switching',
+    body: 'The bars show how many times you switched files per 10-minute window (switch frequency). The pink line tracks rapid switches — file changes that happened within 5 seconds of each other.',
+    thresholds: [
+      { color:'#00B4D8', label:'Switch frequency', desc:'File changes per 10 min. Threshold: >8 adds load' },
+      { color:'#FF4B7D', label:'Rapid switches',   desc:'Switches under 5s apart. Threshold: >5 adds load' },
+      { color:'rgba(0,180,216,.4)', label:'Reading mode', desc:'Low typing + moderate switches = score dampened' },
+    ]
+  },
+  dw: {
+    title: 'Deep Work vs Idle',
+    body: 'Deep work = the longest continuous block of typing without going idle (2+ min with no activity). Idle time = total minutes where no keystrokes were detected. High idle is fine if you\'re reading or thinking.',
+    thresholds: [
+      { color:'#1ABC9C', label:'Deep work', desc:'Longest uninterrupted coding block (minutes)' },
+      { color:'#FF8C42', label:'Idle time', desc:'Total idle minutes in the session' },
+    ]
+  },
+  heat: {
+    title: 'Cognitive Load Heatmap',
+    body: 'Each cell = one session. Rows = hour of day, columns = date. Color shows that session\'s cognitive load score. Dark = low load; red = high load. Useful for spotting your peak performance hours.',
+    thresholds: [
+      { color:'#1ABC9C', label:'Green (<30)',  desc:'Stable, low cognitive load' },
+      { color:'#F39C12', label:'Yellow (<60)', desc:'Mild strain' },
+      { color:'#FF8C42', label:'Orange (<80)', desc:'High load' },
+      { color:'#FF4B7D', label:'Red (80+)',    desc:'Burnout risk' },
+    ]
+  },
+};
+
+function infoPopHtml(id) {
+  const cfg = CHART_INFO[id]; if (!cfg) { return ''; }
+  let thtml = '';
+  if (cfg.thresholds) {
+    thtml = '<div class="thresholds">' + cfg.thresholds.map(t =>
+      \`<div class="trow"><span class="tdot" style="background:\${t.color}"></span><strong>\${t.label}</strong><span class="tval">— \${t.desc}</span></div>\`
+    ).join('') + '</div>';
+  }
+  return \`<div class="info-pop" id="info-\${id}">
+    <strong>\${cfg.title}</strong> — \${cfg.body}\${thtml}
+  </div>\`;
+}
+
+function secHtml(label, infoId) {
+  const btn = infoId
+    ? \`<button class="info-btn" data-action="toggleInfo" data-id="\${infoId}" title="What does this chart mean?">ℹ</button>\`
+    : '';
+  return \`<div class="sec">\${label}\${btn}</div>\`;
+}
+
 function drawGauge(canvasId, score, label){
   const el=document.getElementById(canvasId); if(!el) return;
   const dpr=window.devicePixelRatio||1, size=160;
@@ -527,6 +593,11 @@ function drawGauge(canvasId, score, label){
   ctx.fillStyle=scoreColor(score); ctx.font='bold 28px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(score, cx, cy+10);
   ctx.fillStyle='#C9D1D9'; ctx.font='bold 9px sans-serif'; ctx.fillText(label, cx, cy-r-6);
+  // Zone labels on gauge arc
+  ctx.font='7px sans-serif'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#1ABC9C'; ctx.textAlign='center'; ctx.fillText('Stable',cx-r+2,cy+22);
+  ctx.fillStyle='#F39C12'; ctx.fillText('Mild',cx,cy+22);
+  ctx.fillStyle='#FF4B7D'; ctx.textAlign='center'; ctx.fillText('Risk',cx+r-4,cy+22);
   ctx.fillStyle='#8B949E'; ctx.font='9px monospace'; ctx.textBaseline='alphabetic';
   ctx.textAlign='left'; ctx.fillText('0',cx-r-2,cy+14);
   ctx.textAlign='right'; ctx.fillText('100',cx+r+2,cy+14);
@@ -539,11 +610,17 @@ function drawTrend(features){
   const scores=features.map(f=>f.baseline_score!=null?f.baseline_score:(f.cognitive_score||0));
   const step=cw/(scores.length-1);
   const px=i=>pad.l+i*step, py=v=>pad.t+ch-(v/100)*ch;
-  [[80,'rgba(255,75,125,.55)'],[60,'rgba(255,140,66,.5)']].forEach(([t,col])=>{
-    const y=py(t); ctx.setLineDash([6,4]);
+
+  // Threshold bands with labels
+  const thresholds = [{v:80,c:'rgba(255,75,125,.55)',lbl:'Burnout 80'},{v:60,c:'rgba(255,140,66,.5)',lbl:'High 60'},{v:30,c:'rgba(243,156,18,.35)',lbl:'Mild 30'}];
+  thresholds.forEach(({v,c,lbl})=>{
+    const y=py(v); ctx.setLineDash([6,4]);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
-    ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle=c; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle=c.replace(/,[^)]+\)/,',0.9)');
+    ctx.fillText(lbl, pad.l+cw-1, y-2);
   });
+
   ctx.setLineDash([3,4]);
   ctx.beginPath(); scores.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
   ctx.strokeStyle='#00B4D8'; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.stroke(); ctx.setLineDash([]);
@@ -569,6 +646,10 @@ function drawBreakdown(features){
   [0,50,100,150].forEach(v=>{ const y=pad.t+ch-(v/180)*ch; if(y<pad.t) return;
     ctx.fillText(v,pad.l-3,y+3); ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
     ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.stroke(); });
+  // Y-axis label
+  ctx.save(); ctx.translate(7,pad.t+ch/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillStyle='#8B949E'; ctx.font='7px sans-serif';
+  ctx.fillText('pts',0,0); ctx.restore();
   ctx.textAlign='center'; ctx.fillStyle='#8B949E';
   features.forEach((f,i)=>{ if(i%2!==0) return; ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(bw+gap)+bw/2,h-4); });
 }
@@ -580,9 +661,23 @@ function drawErrors(features){
   const avg=features.map(f=>f.avg_error_rate||0), peak=features.map(f=>f.max_error_rate||0);
   const maxV=Math.max(...avg,...peak,15), step=cw/(features.length-1);
   const px=i=>pad.l+i*step, py=v=>pad.t+ch-(v/maxV)*ch;
+
+  // Threshold line at 5 errors/window with label
   const ty=py(5); ctx.setLineDash([5,3]);
   ctx.beginPath(); ctx.moveTo(pad.l,ty); ctx.lineTo(pad.l+cw,ty);
   ctx.strokeStyle='rgba(243,156,18,.75)'; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(243,156,18,.9)';
+  ctx.fillText('threshold (5/window)', pad.l+2, ty-2);
+
+  // Second threshold at 12
+  if(maxV>10){
+    const ty2=py(12); ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l,ty2); ctx.lineTo(pad.l+cw,ty2);
+    ctx.strokeStyle='rgba(255,75,125,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,75,125,.8)';
+    ctx.fillText('critical (12)', pad.l+2, ty2-2);
+  }
+
   const gp=ctx.createLinearGradient(0,pad.t,0,h); gp.addColorStop(0,'rgba(255,140,66,.2)'); gp.addColorStop(1,'rgba(255,140,66,0)');
   ctx.beginPath(); peak.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
   ctx.lineTo(px(features.length-1),h); ctx.lineTo(px(0),h); ctx.closePath(); ctx.fillStyle=gp; ctx.fill();
@@ -595,6 +690,10 @@ function drawErrors(features){
   ctx.beginPath(); avg.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
   ctx.strokeStyle='#FF4B7D'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
   avg.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(px(i),py(v),3,0,Math.PI*2); ctx.fillStyle='#FF4B7D'; ctx.fill(); });
+
+  // Y-axis label
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#8B949E';
+  ctx.fillText('errors/10 min', pad.l, h-1);
 }
 
 function drawContext(features){
@@ -604,14 +703,36 @@ function drawContext(features){
   const n=features.length, bw=Math.max(5,Math.min(18,cw/n-4)), gap=(cw-n*bw)/(n+1);
   const freqs=features.map(f=>f.avg_switch_frequency||0), rapids=features.map(f=>f.rapid_switch_count||0);
   const maxF=Math.max(...freqs,1), maxR=Math.max(...rapids,1);
+
+  // Threshold lines for switch frequency
+  const thresh8 = pad.t+ch-(8/Math.max(maxF,16))*ch;
+  const thresh15 = pad.t+ch-(15/Math.max(maxF,16))*ch;
+  if(thresh8 > pad.t){
+    ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(pad.l,thresh8); ctx.lineTo(pad.l+cw,thresh8);
+    ctx.strokeStyle='rgba(243,156,18,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(243,156,18,.75)';
+    ctx.fillText('>8 mild', pad.l+cw-1, thresh8-2);
+  }
+  if(thresh15 > pad.t){
+    ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(pad.l,thresh15); ctx.lineTo(pad.l+cw,thresh15);
+    ctx.strokeStyle='rgba(255,140,66,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,140,66,.8)';
+    ctx.fillText('>15 high', pad.l+cw-1, thresh15-2);
+  }
+
   features.forEach((_,i)=>{ const bh=(freqs[i]/maxF)*ch; ctx.fillStyle='rgba(0,180,216,.75)'; ctx.fillRect(pad.l+gap+i*(bw+gap),pad.t+ch-bh,bw,bh); });
   ctx.beginPath(); rapids.forEach((v,i)=>{ const x=pad.l+gap+i*(bw+gap)+bw/2, y=pad.t+ch-(v/maxR)*ch; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
   ctx.strokeStyle='#FF4B7D'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
   rapids.forEach((v,i)=>{ const x=pad.l+gap+i*(bw+gap)+bw/2, y=pad.t+ch-(v/maxR)*ch;
     ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.fillStyle='#FF4B7D'; ctx.fill();
     ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.strokeStyle='#0D1117'; ctx.lineWidth=1.5; ctx.stroke(); });
+
   ctx.font='8px monospace'; ctx.textAlign='center'; ctx.fillStyle='#8B949E';
   features.forEach((f,i)=>{ if(i%2!==0) return; ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(bw+gap)+bw/2,h-4); });
+
+  // Y-axis units
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#8B949E';
+  ctx.fillText('switches/10 min', pad.l, h-1);
 }
 
 function drawDeepWork(features){
@@ -622,11 +743,25 @@ function drawDeepWork(features){
   const dw=features.map(f=>f.longest_deep_work_minutes||0);
   const idle=features.map(f=>(f.session_duration_minutes||0)*(f.idle_ratio||0));
   const maxV=Math.max(...dw,...idle,1);
+
+  // Deep work goal line at 25 minutes
+  const goalY = pad.t+ch-(25/Math.max(maxV,30))*ch;
+  if(goalY > pad.t){
+    ctx.setLineDash([5,3]); ctx.beginPath(); ctx.moveTo(pad.l,goalY); ctx.lineTo(pad.l+cw,goalY);
+    ctx.strokeStyle='rgba(26,188,156,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(26,188,156,.8)';
+    ctx.fillText('goal 25 min', pad.l+cw-1, goalY-2);
+  }
+
   features.forEach((f,i)=>{ const x=pad.l+gap+i*(pw+gap);
     ctx.fillStyle='#1ABC9C'; ctx.fillRect(x,pad.t+ch-(dw[i]/maxV)*ch,bw,(dw[i]/maxV)*ch);
     ctx.fillStyle='#FF8C42'; ctx.fillRect(x+bw+2,pad.t+ch-(idle[i]/maxV)*ch,bw,(idle[i]/maxV)*ch); });
   ctx.font='8px monospace'; ctx.textAlign='center'; ctx.fillStyle='#8B949E';
   features.forEach((f,i)=>{ if(i%2!==0) return; ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(pw+gap)+pw/2,h-4); });
+
+  // Y-axis units
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#8B949E';
+  ctx.fillText('minutes', pad.l, h-1);
 }
 
 function drawHeatmap(features){
@@ -718,7 +853,13 @@ function renderDangerZone(){
 
 document.body.addEventListener('click', function(e) {
   const el = e.target.closest('[data-action]');
-  if (!el) { return; }
+  if (!el) {
+    // Click outside any info popover closes all
+    if (!e.target.closest('.info-pop') && !e.target.closest('.info-btn')) {
+      document.querySelectorAll('.info-pop.show').forEach(p => p.classList.remove('show'));
+    }
+    return;
+  }
   const action = el.getAttribute('data-action');
   if (action === 'toggleDanger') {
     dangerOpen = !dangerOpen;
@@ -726,6 +867,8 @@ document.body.addEventListener('click', function(e) {
     const tog  = document.getElementById('dtoggle');
     if (body) { body.classList.toggle('open', dangerOpen); }
     if (tog)  { tog.classList.toggle('open',  dangerOpen); }
+  } else if (action === 'toggleInfo') {
+    toggleInfo(el.getAttribute('data-id'));
   } else if (action === 'showConfirm') {
     const box = document.getElementById('confirm-' + el.getAttribute('data-id'));
     if (box) { box.classList.add('show'); }
@@ -772,7 +915,12 @@ window.addEventListener('message', ev => {
     devChipHtml=\`<div class="dev-chip \${cls}">📊 \${lat.deviation_summary}</div>\`;
   }
 
-  // Clean alert list — no filesystem paths shown to users
+  // Reading mode chip — shown when the last session was detected as reading/debugging
+  // This tells the user why the score may be lower than expected during a read-heavy session
+  const readingChipHtml = lat.reading_mode
+    ? \`<div class="reading-chip">👁 Reading mode detected — context switching score dampened</div>\`
+    : '';
+
   let alertHtml='<div class="noalerts">✅ No alerts in this period.</div>';
   if(alerts.length){
     alertHtml='<div class="alist">'+alerts.slice().reverse().slice(0,6).map(a=>{
@@ -803,22 +951,25 @@ window.addEventListener('message', ev => {
   document.getElementById('content').innerHTML = \`
     \${calibBanner}
     \${devChipHtml}
+    \${readingChipHtml}
     <div class="sec">Overview</div>
     <div class="mcards">
       <div class="mc"><div class="mc-lbl">Current Score</div><div class="mc-val" style="color:\${scoreColor(displayScore)}">\${displayScore}/100</div><div class="mc-sub">\${isCalibrating?'rule-based':'personalised'}</div></div>
       <div class="mc"><div class="mc-lbl">Status</div><div class="mc-val" style="color:\${scoreColor(displayScore)}">\${displayLabel}</div></div>
       <div class="mc"><div class="mc-lbl">Session Avg</div><div class="mc-val">\${avgBaseline||avgRaw}</div><div class="mc-sub">\${avgBaseline?'personalised':'rule-based'}</div></div>
       <div class="mc"><div class="mc-lbl">High Load</div><div class="mc-val">\${highLoad}/\${features.length}</div><div class="mc-sub">sessions ≥60</div></div>
-      <div class="mc"><div class="mc-lbl">KPM</div><div class="mc-val">\${kpm}</div></div>
-      <div class="mc"><div class="mc-lbl">Total Hours</div><div class="mc-val">\${totalHours}h</div></div>
+      <div class="mc"><div class="mc-lbl">KPM</div><div class="mc-val">\${kpm}</div><div class="mc-sub">keystrokes/min</div></div>
+      <div class="mc"><div class="mc-lbl">Total Hours</div><div class="mc-val">\${totalHours}h</div><div class="mc-sub">this device</div></div>
     </div>
     <div class="sec">Current Cognitive Load</div>
     <div class="gauge-wrap"><canvas id="c_gauge"></canvas></div>
-    <div class="sec">Score Trend</div>
+    \${secHtml('Score Trend', 'trend')}
+    \${infoPopHtml('trend')}
     <div class="cw"><canvas id="c_trend"></canvas>
-      <div class="xlbl"><span>\${xL}</span><span style="color:rgba(255,75,125,.7)">── Burnout 80</span><span style="color:rgba(255,140,66,.7)">── High 60</span><span>\${xR}</span></div>
+      <div class="xlbl"><span>\${xL}</span><span>\${xR}</span></div>
     </div>
-    <div class="sec">Score Breakdown by Category</div>
+    \${secHtml('Score Breakdown by Category', 'break')}
+    \${infoPopHtml('break')}
     <div class="cw"><canvas id="c_break"></canvas>
       <div class="leg">
         <span><span class="ld" style="background:#00B4D8"></span>Typing</span>
@@ -827,28 +978,32 @@ window.addEventListener('message', ev => {
         <span><span class="ld" style="background:#FF8C42"></span>Session</span>
       </div>
     </div>
-    <div class="sec">Error Density</div>
+    \${secHtml('Error Density', 'err')}
+    \${infoPopHtml('err')}
     <div class="cw"><canvas id="c_err"></canvas>
       <div class="leg">
         <span><span class="ld" style="background:#FF4B7D"></span>Avg Error Rate</span>
         <span><span class="ld" style="background:#FF8C42;opacity:.8"></span>Peak Error Rate</span>
       </div>
     </div>
-    <div class="sec">Context Switching</div>
+    \${secHtml('Context Switching', 'ctx')}
+    \${infoPopHtml('ctx')}
     <div class="cw"><canvas id="c_ctx"></canvas>
       <div class="leg">
-        <span><span class="ld" style="background:#00B4D8;opacity:.75"></span>Switch Frequency</span>
+        <span><span class="ld" style="background:#00B4D8;opacity:.75"></span>Switch Freq/10 min</span>
         <span><span class="ld" style="background:#FF4B7D"></span>Rapid Switches</span>
       </div>
     </div>
-    <div class="sec">Deep Work vs Idle Time</div>
+    \${secHtml('Deep Work vs Idle Time', 'dw')}
+    \${infoPopHtml('dw')}
     <div class="cw"><canvas id="c_dw"></canvas>
       <div class="leg">
         <span><span class="ld" style="background:#1ABC9C"></span>Deep Work (min)</span>
         <span><span class="ld" style="background:#FF8C42"></span>Idle Time (min)</span>
       </div>
     </div>
-    <div class="sec">Cognitive Load Heatmap</div>
+    \${secHtml('Cognitive Load Heatmap', 'heat')}
+    \${infoPopHtml('heat')}
     <div class="hmwrap"><canvas id="c_heat"></canvas>
       <div class="hmleg"><span>Low</span><div class="hmgrad"></div><span>High</span></div>
     </div>

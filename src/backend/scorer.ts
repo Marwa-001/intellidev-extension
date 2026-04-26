@@ -1,13 +1,6 @@
-/**
- * scorer.ts
- * Mirrors Python backend/inference_engine/scorer.py + rules.py
- * 20 rules across 4 categories — pure TypeScript, no ML.
- */
-
 import type { FeatureVector } from './featureExtractor';
 
-// ── Score levels ──────────────────────────────────────────────────────────────
-
+// ── Score levels
 export interface ScoreLevel {
   label: string;
   color: string;
@@ -46,7 +39,7 @@ export function getScoreLevel(score: number): ScoreLevel {
   return SCORE_LEVELS[3];
 }
 
-// ── Rule interfaces ───────────────────────────────────────────────────────────
+// ── Rule interfaces
 
 export interface ScoringRule {
   name: string;
@@ -61,9 +54,20 @@ export interface ScoringResult {
   triggered_rules: ScoringRule[];
   category_scores: { typing: number; error: number; context: number; session: number };
   feature_snapshot: Record<string, number | boolean>;
+  reading_mode: boolean;   // true when reading/debugging dampening was applied
 }
 
-// ── Scoring functions ─────────────────────────────────────────────────────────
+// ── Reading-mode detection 
+
+function isReadingMode(f: FeatureVector): boolean {
+  return (
+    f.avg_kpm < 5 &&                    // near-zero typing
+    f.avg_switch_frequency < 15 &&      // not frantically jumping around
+    f.rapid_switch_count <= 5           // switches are deliberate, not frantic
+  );
+}
+
+// ── Scoring functions
 
 function scoreTyping(f: FeatureVector): [number, ScoringRule[]] {
   let s = 0;
@@ -91,19 +95,34 @@ function scoreErrors(f: FeatureVector): [number, ScoringRule[]] {
   return [s, rules];
 }
 
-function scoreContext(f: FeatureVector): [number, ScoringRule[]] {
+function scoreContext(f: FeatureVector, readingMode: boolean): [number, ScoringRule[]] {
   let s = 0;
   const rules: ScoringRule[] = [];
 
-  if (f.avg_switch_frequency > 8)  { s += 10; rules.push({ name: 'high_switch_frequency',      points: 10, category: 'context' }); }
-  if (f.avg_switch_frequency > 15) { s +=  8; rules.push({ name: 'very_high_switch_frequency', points:  8, category: 'context' }); }
-  if (f.rapid_switch_count > 5)    { s +=  7; rules.push({ name: 'rapid_switches_detected',    points:  7, category: 'context' }); }
-  if (f.avg_unique_files > 6)      { s +=  5; rules.push({ name: 'high_unique_files',           points:  5, category: 'context' }); }
+  // In reading mode, apply a 0.4× dampening multiplier to context penalties.
+  // The developer is intentionally navigating files; this is focused work,
+  // not cognitive fragmentation.
+  const dampen = readingMode ? 0.4 : 1.0;
+
+  if (f.avg_switch_frequency > 8) {
+    const pts = Math.round(10 * dampen);
+    if (pts > 0) { s += pts; rules.push({ name: readingMode ? 'high_switch_frequency_reading' : 'high_switch_frequency', points: pts, category: 'context' }); }
+  }
+  if (f.avg_switch_frequency > 15) {
+    const pts = Math.round(8 * dampen);
+    if (pts > 0) { s += pts; rules.push({ name: readingMode ? 'very_high_switch_frequency_reading' : 'very_high_switch_frequency', points: pts, category: 'context' }); }
+  }
+  if (f.rapid_switch_count > 5) {
+    // Rapid switches in reading mode are still a mild signal but dampened
+    const pts = Math.round(7 * dampen);
+    if (pts > 0) { s += pts; rules.push({ name: readingMode ? 'rapid_switches_reading' : 'rapid_switches_detected', points: pts, category: 'context' }); }
+  }
+  if (f.avg_unique_files > 6)      { s +=  5; rules.push({ name: 'high_unique_files', points: 5, category: 'context' }); }
 
   return [s, rules];
 }
 
-function scoreSession(f: FeatureVector): [number, ScoringRule[]] {
+function scoreSession(f: FeatureVector, readingMode: boolean): [number, ScoringRule[]] {
   let s = 0;
   const rules: ScoringRule[] = [];
 
@@ -112,21 +131,27 @@ function scoreSession(f: FeatureVector): [number, ScoringRule[]] {
   if (f.idle_ratio > 0.4)               { s +=  5; rules.push({ name: 'high_idle_ratio',            points:  5, category: 'session' }); }
   if (f.night_time_minutes > 0)         { s += 10; rules.push({ name: 'night_activity',             points: 10, category: 'session' }); }
   if (f.night_time_minutes > 30)        { s +=  8; rules.push({ name: 'extended_night_activity',    points:  8, category: 'session' }); }
-  if (f.session_duration_minutes > 30 && f.longest_deep_work_minutes < 10) {
-                                          s +=  7; rules.push({ name: 'no_deep_work',               points:  7, category: 'session' }); }
+
+  // Skip the no_deep_work rule entirely in reading mode — reading IS deep work,
+  // it just doesn't produce keystrokes. Firing this rule during a debugging
+  // read-through is a false positive.
+  if (!readingMode && f.session_duration_minutes > 30 && f.longest_deep_work_minutes < 10) {
+    s += 7; rules.push({ name: 'no_deep_work', points: 7, category: 'session' });
+  }
 
   return [s, rules];
 }
 
-// ── Main scorer ───────────────────────────────────────────────────────────────
-
+// ── Main scorer 
 export function computeScore(features: FeatureVector): ScoringResult {
+  const readingMode = isReadingMode(features);
+
   const [ts, tr] = scoreTyping(features);
   const [es, er] = scoreErrors(features);
-  const [cs, cr] = scoreContext(features);
-  const [ss, sr] = scoreSession(features);
+  const [cs, cr] = scoreContext(features, readingMode);
+  const [ss, sr] = scoreSession(features, readingMode);
 
-  const raw   = ts + es + cs + ss;
+  const raw    = ts + es + cs + ss;
   const capped = Math.min(raw, 100);
   const level  = getScoreLevel(capped);
 
@@ -150,5 +175,6 @@ export function computeScore(features: FeatureVector): ScoringResult {
       longest_deep_work_minutes: features.longest_deep_work_minutes,
       night_time_minutes:        features.night_time_minutes,
     },
+    reading_mode: readingMode,
   };
 }

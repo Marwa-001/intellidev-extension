@@ -2,9 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Types
-// ─────────────────────────────────────────────────────────────────────────────
 
 export interface FeatureMetrics {
   avg_kpm:                   number;
@@ -54,13 +52,10 @@ export interface ScoredSession {
 
 export type DeleteResult = { success: boolean; message: string };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Constants
-// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Change back to MIN_SESSIONS=10, MIN_HOURS=10 before publishing ────────────
-const MIN_SESSIONS   = 10;    // production: 10
-const MIN_HOURS      = 10;    // production: 10
+const MIN_SESSIONS   = 10;
+const MIN_HOURS      = 10; 
 
 const RETENTION_DAYS = 90;
 const DRIFT_EVERY    = 30;
@@ -91,9 +86,7 @@ const METRIC_WEIGHTS: Record<keyof FeatureMetrics, number> = {
   night_time_minutes:         0.7,
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // BaselineManager
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class BaselineManager {
   private _state: BaselineState;
@@ -107,7 +100,7 @@ export class BaselineManager {
     this._state      = this._load();
   }
 
-  // ── Public getters ──────────────────────────────────────────────────────────
+  // ── Public getters 
 
   get uuid():                string               { return this._state.uuid; }
   get isCalibrated():        boolean              { return this._state.isCalibrated; }
@@ -123,10 +116,10 @@ export class BaselineManager {
     return Math.min(1, Math.min(bySession, byHours));
   }
 
-  // ── Register features dir so delete methods know where data lives ──────────
+  // ── Register features dir so delete methods know where data lives
   setFeaturesDir(dir: string): void { this._featuresDir = dir; }
 
-  // ── 90-day pruning ─────────────────────────────────────────────────────────
+  // ── 90-day pruning
 
   pruneOldSessions(featuresDir: string): number {
     if (!fs.existsSync(featuresDir)) { return 0; }
@@ -148,7 +141,7 @@ export class BaselineManager {
     return pruned;
   }
 
-  // ── Calibration sync ───────────────────────────────────────────────────────
+  // ── Calibration sync
 
   updateCalibrationCount(sessionCount: number, totalHours: number): void {
     if (sessionCount > this._state.calibrationSessions || totalHours > this._state.calibrationHours) {
@@ -158,7 +151,7 @@ export class BaselineManager {
     }
   }
 
-  // ── Baseline lock & drift ──────────────────────────────────────────────────
+  // ── Baseline lock & drift 
 
   lockBaseline(allSessions: FeatureMetrics[]): void {
     const stats = this._computeStats(allSessions);
@@ -195,7 +188,7 @@ export class BaselineManager {
 
   flagDriftNeeded(): void { this._state.needsDrift = true; this._save(); }
 
-  // ── Scoring ────────────────────────────────────────────────────────────────
+  // ── Scoring 
 
   scoreSession(metrics: FeatureMetrics, rawScore: number): ScoredSession {
     const rawLabel            = this._labelFor(rawScore);
@@ -229,7 +222,7 @@ export class BaselineManager {
     return { rawScore, rawLabel, baselineScore, baselineLabel, deviationSummary, isCalibrating: false, calibrationProgress: 1 };
   }
 
-  // ── Data deletion methods ──────────────────────────────────────────────────
+  // ── Data deletion methods
 
   /** Delete all session + alert JSON files. Keep baseline intact. */
   deleteSessionData(featuresDir: string, alertsDir: string): DeleteResult {
@@ -283,7 +276,7 @@ export class BaselineManager {
     }
   }
 
-  // ── Private helpers ────────────────────────────────────────────────────────
+  // ── Private helpers
 
   private _computeStats(sessions: FeatureMetrics[]): { mean: Partial<FeatureMetrics>; std: Partial<FeatureMetrics> } {
     const mean: Partial<FeatureMetrics> = {};

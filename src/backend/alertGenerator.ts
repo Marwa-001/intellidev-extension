@@ -1,17 +1,3 @@
-/**
- * alertGenerator.ts
- * Builds contextual alert messages and enforces cooldowns.
- *
- * All timestamps in alerts use local time derived from getTimezoneOffset()
- * so alert times always reflect the developer's local clock, not UTC.
- *
- * Cooldowns:
- *   - burnout_risk : shared cooldownMs (default 5 min)
- *   - overload     : shared cooldownMs (default 5 min)
- *   - long_session : shared cooldownMs (default 5 min)
- *   - night_warning: NIGHT_COOLDOWN_MS (30 min) — independent
- */
-
 import type { ScoringResult } from './scorer';
 import { getCurrentLocalTime } from '../utils/timeUtils';
 
@@ -30,26 +16,17 @@ export interface Alert {
   acknowledged:    boolean;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
+// ── Constants 
 const NIGHT_WARNING_MIN_MINUTES = 15;
 const NIGHT_COOLDOWN_MS         = 30 * 60 * 1000;  // 30 minutes
 
-// ── Local timestamp ───────────────────────────────────────────────────────────
-
-/**
- * Returns a timestamp string in the developer's local time (YYYY-MM-DD HH:MM:SS).
- * Uses getTimezoneOffset() which is always correct regardless of the Node.js
- * process TZ environment variable — fixes wrong alert times on Windows machines
- * where the extension host defaults to UTC.
- */
 function localTimestamp(): string {
   const now     = new Date();
   const localMs = now.getTime() - (now.getTimezoneOffset() * 60 * 1000);
   return new Date(localMs).toISOString().replace('T', ' ').slice(0, 19);
 }
 
-// ── Message builders ──────────────────────────────────────────────────────────
+// ── Message builders
 
 function buildOverloadMessage(result: ScoringResult): string {
   const names        = result.triggered_rules.map(r => r.name);
@@ -94,8 +71,7 @@ function buildNightWarningMessage(nightMinutes: number): string {
   return `Late-night coding detected — ${mins} min of activity after 10 pm or before 5 am. Current local time: ${timeStr}. Sleep disruption may affect tomorrow's performance.`;
 }
 
-// ── Alert generator ───────────────────────────────────────────────────────────
-
+// ── Alert generator 
 export class AlertGenerator {
   private lastAlertTimes: Map<string, number> = new Map();
   private lastNightAlert: number = 0;
@@ -127,7 +103,7 @@ export class AlertGenerator {
     const ts        = localTimestamp();
     const ruleNames = result.triggered_rules.map(r => r.name);
 
-    // ── Burnout (score >= 80) ──────────────────────────────────────────────
+    // ── Burnout (score >= 80) 
     if (result.capped_score >= 80 && !this.onCooldown('burnout_risk')) {
       alerts.push({
         alert_id:        this.nextId(sessionId, 'burnout_risk'),
@@ -143,7 +119,7 @@ export class AlertGenerator {
       });
       this.record('burnout_risk');
     }
-    // ── Overload (score 60-79) ─────────────────────────────────────────────
+    // ── Overload (score 60-79) 
     else if (result.capped_score >= 60 && !this.onCooldown('overload')) {
       alerts.push({
         alert_id:        this.nextId(sessionId, 'overload'),
@@ -160,7 +136,7 @@ export class AlertGenerator {
       this.record('overload');
     }
 
-    // ── Long session ───────────────────────────────────────────────────────
+    // ── Long session 
     const duration = Number(result.feature_snapshot.session_duration_minutes ?? 0);
     if (duration > 120 && !this.onCooldown('long_session')) {
       alerts.push({
@@ -178,7 +154,7 @@ export class AlertGenerator {
       this.record('long_session');
     }
 
-    // ── Night warning - 30-minute independent cooldown ─────────────────────
+    // ── Night warning - 30-minute independent cooldown
     const nightMins = Number(result.feature_snapshot.night_time_minutes ?? 0);
     if (nightMins >= NIGHT_WARNING_MIN_MINUTES && !this.nightOnCooldown()) {
       alerts.push({

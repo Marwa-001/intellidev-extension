@@ -1,17 +1,3 @@
-/**
- * timeUtils.ts
- *
- * All time functions use explicit timezone offset calculation instead of
- * getHours()/getDate() etc. which can return UTC in VS Code's extension
- * host process on some Windows machines even when the OS timezone is
- * correctly configured.
- *
- * The fix: derive local time from getTimezoneOffset() which reads directly
- * from the OS timezone database and is always correct regardless of the
- * process environment variable TZ.
- */
-
-/** Returns a Date object adjusted to the developer's local timezone. */
 function localDate(): Date {
   const now = new Date();
   const localMs = now.getTime() - (now.getTimezoneOffset() * 60 * 1000);
