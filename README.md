@@ -61,16 +61,16 @@ IntelliDev samples four behavioral dimensions continuously while you work:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│   🎹  TYPING         Rhythm, variability, backspace rate,       │
+│   [KEY]  TYPING      Rhythm, variability, backspace rate,       │
 │                      pauses between bursts                      │
 │                                                                 │
-│   ⚠️  ERRORS         Compilation error frequency, burst         │
+│   [ERR]  ERRORS      Compilation error frequency, burst         │
 │                      detection, debug session count             │
 │                                                                 │
-│   🔀  CONTEXT        File switch frequency, rapid switches,     │
+│   [CTX]  CONTEXT     File switch frequency, rapid switches,     │
 │                      unique files touched per window            │
 │                                                                 │
-│   ⏱️  SESSION        Total time coded, deep work blocks,        │
+│   [SES]  SESSION     Total time coded, deep work blocks,        │
 │                      idle ratio, night-time activity            │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -94,11 +94,11 @@ These feed a **20-rule scoring engine** across all four categories. The result u
   0 ──────────── 30 ──────────── 60 ──────────── 80 ─────── 100
   │                │               │               │            │
   │   🟢 STABLE   │  🟡 MILD      │  🟠 HIGH      │  🔴 RISK  │
-  │   FOCUS        │  STRAIN       │  LOAD         │           │
+  │   FOCUS        │  STRAIN       │  LOAD         │            │
   │                │               │               │            │
-  │  You're in     │  Consider     │  Take a       │  Stop.    │
-  │  flow.         │  a short      │  10-15 min    │  Rest 30+ │
-  │  Keep going.   │  break.       │  break.       │  minutes. │
+  │  You're in     │  Consider     │  Take a       │  Stop.     │
+  │  flow.         │  a short      │  10-15 min    │  Rest 30+  │
+  │  Keep going.   │  break.       │  break.       │  minutes.  │
   │                │               │               │            │
   0 ──────────── 30 ──────────── 60 ──────────── 80 ─────── 100
 ```
