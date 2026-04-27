@@ -1,11 +1,3 @@
-/**
- * eventLogger.ts
- *
- * Change vs original: constructor now accepts an explicit `sessionsDir`
- * string that is resolved by extension.ts (single source of truth).
- * The internal path-guessing logic is removed — the caller is responsible.
- */
-
 import * as vscode from 'vscode';
 import * as fs     from 'fs';
 import * as path   from 'path';
@@ -25,15 +17,10 @@ export class EventLogger {
   private flushInterval?:       ReturnType<typeof setInterval>;
   private readonly FLUSH_MS =   10_000;   // flush every 10 s
 
-  /**
-   * @param context     Extension context (kept for compatibility; not used for path logic)
-   * @param sessionsDir Absolute path to the sessions directory.
-   *                    Resolved once in extension.ts and passed here.
-   */
+  
   constructor(_context: vscode.ExtensionContext, sessionsDir: string) {
     this.sessionId = getSessionId();
 
-    // Ensure the directory exists (extension.ts already does this, but be safe)
     if (!fs.existsSync(sessionsDir)) {
       fs.mkdirSync(sessionsDir, { recursive: true });
     }
@@ -43,7 +30,7 @@ export class EventLogger {
     this._startFlush();
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────
+  // ── Init 
 
   private _initLogFile(): void {
     const header = {
@@ -54,7 +41,7 @@ export class EventLogger {
     fs.writeFileSync(this.logFilePath, JSON.stringify(header, null, 2), 'utf-8');
   }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // ── Public API
 
   log(eventType: TelemetryEvent['eventType'], data: Record<string, number | string | boolean>): void {
     this.buffer.push({
@@ -73,8 +60,7 @@ export class EventLogger {
     if (this.flushInterval) { clearInterval(this.flushInterval); }
   }
 
-  // ── Internal ───────────────────────────────────────────────────────────────
-
+  // ── Internal 
   private _flush(): void {
     if (!this.buffer.length) { return; }
     try {

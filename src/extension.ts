@@ -1,13 +1,3 @@
-/**
- * extension.ts — IntelliDev entry point
- *
- * Changes vs original:
- *  1. Single source-of-truth for data paths (unchanged).
- *  2. Sets `intellidev.paused` context key on pause/resume so the sidebar
- *     menu correctly shows either the pause or resume button icon.
- *  3. Removed enableVoiceAlerts — setting no longer exists.
- */
-
 import * as vscode from 'vscode';
 import * as path   from 'path';
 import * as fs     from 'fs';
@@ -22,8 +12,7 @@ import { BaselineManager }                from './Baselinemanager';
 import { BackendEngine }                  from './backend/backendEngine';
 import type { Alert }                     from './backend/alertGenerator';
 
-// ── Module-level handles ──────────────────────────────────────────────────────
-
+// ── Module-level handles 
 let logger:            EventLogger           | undefined;
 let typingTracker:     TypingTracker         | undefined;
 let errorTracker:      ErrorTracker          | undefined;
@@ -35,7 +24,7 @@ let backendEngine:     BackendEngine         | undefined;
 let statusBarItem:     vscode.StatusBarItem  | undefined;
 let isTracking = true;
 
-// ── Path resolution (single source of truth) ─────────────────────────────────
+// ── Path resolution (single source of truth)
 
 function resolveDataPaths(context: vscode.ExtensionContext): {
   sessionsDir: string;
@@ -65,17 +54,16 @@ function resolveDataPaths(context: vscode.ExtensionContext): {
   return { sessionsDir, dataDir, featuresDir, alertsDir };
 }
 
-// ── Activate ─────────────────────────────────────────────────────────────────
-
+// ── Activate 
 export function activate(context: vscode.ExtensionContext): void {
   console.log('[IntelliDev] Extension activating…');
 
-  // ── 1. Baseline manager ───────────────────────────────────────────────────
+  // ── 1. Baseline manager
   baselineManager = new BaselineManager(context);
   console.log(`[IntelliDev] User UUID: ${baselineManager.uuid}`);
   console.log(`[IntelliDev] Calibrated: ${baselineManager.isCalibrated} | Sessions: ${baselineManager.calibrationSessions}`);
 
-  // ── 2. Resolve paths ──────────────────────────────────────────────────────
+  // ── 2. Resolve paths 
   const { sessionsDir, dataDir, featuresDir, alertsDir } = resolveDataPaths(context);
   console.log(`[IntelliDev] Sessions dir : ${sessionsDir}`);
   console.log(`[IntelliDev] Features dir : ${featuresDir}`);
@@ -86,14 +74,14 @@ export function activate(context: vscode.ExtensionContext): void {
     console.log(`[IntelliDev] Pruned ${pruned} session(s) older than 90 days.`);
   }
 
-  // ── 3. Core telemetry trackers ─────────────────────────────────────────────
+  // ── 3. Core telemetry trackers
   logger         = new EventLogger(context, sessionsDir);
   typingTracker  = new TypingTracker(logger);
   errorTracker   = new ErrorTracker(logger);
   contextTracker = new ContextTracker(logger);
   sessionTracker = new SessionTracker(logger);
 
-  // ── 4. Backend engine ─────────────────────────────────────────────────────
+  // ── 4. Backend engine 
   backendEngine = new BackendEngine({
     sessionsDir,
     featuresDir,
@@ -118,7 +106,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   backendEngine.start();
 
-  // ── 5. Sidebar dashboard ──────────────────────────────────────────────────
+  // ── 5. Sidebar dashboard
   dashboardProvider = new IntelliDevDashboardProvider(
     context.extensionUri,
     baselineManager,
@@ -143,7 +131,7 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // ── 6. Status bar ──────────────────────────────────────────────────────────
+  // ── 6. Status bar 
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBarItem.text    = '$(pulse) IntelliDev';
   statusBarItem.tooltip = 'IntelliDev: Cognitive load tracking active. Click to open dashboard.';
@@ -153,7 +141,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialise context key — sidebar menu reads this to show pause vs resume
   vscode.commands.executeCommand('setContext', 'intellidev.paused', false);
 
-  // ── 7. Commands ────────────────────────────────────────────────────────────
+  // ── 7. Commands 
 
   const cmds: vscode.Disposable[] = [
 
@@ -251,7 +239,7 @@ export function activate(context: vscode.ExtensionContext): void {
   console.log(`[IntelliDev] Session started. Log: ${logger.getLogFilePath()}`);
 }
 
-// ── Deactivate ────────────────────────────────────────────────────────────────
+// ── Deactivate 
 
 export function deactivate(): void {
   console.log('[IntelliDev] Deactivating…');

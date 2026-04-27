@@ -1,9 +1,3 @@
-/**
- * featureExtractor.ts
- * Mirrors Python backend/feature_engine/extractor.py
- * Extracts 18 behavioral features from a raw session JSON.
- */
-
 export interface FeatureVector {
   avg_kpm: number;
   typing_variability: number;
@@ -41,7 +35,7 @@ interface SessionLog {
   events: SessionEvent[];
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers 
 
 function filterEvents(events: SessionEvent[], type: string): SessionEvent[] {
   return events.filter(e => e.eventType === type);
@@ -59,7 +53,7 @@ function stdDev(arr: number[]): number {
   return Math.sqrt(variance);
 }
 
-// ── Sub-extractors ────────────────────────────────────────────────────────────
+// ── Sub-extractors
 
 function extractTyping(events: SessionEvent[]): Partial<FeatureVector> {
   const keystrokes = filterEvents(events, 'keystroke');
@@ -146,7 +140,7 @@ function extractSession(session: SessionLog): Partial<FeatureVector> {
   };
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── Public API 
 
 export function extractFeatures(session: SessionLog): FeatureVector {
   const typing  = extractTyping(session.events);
