@@ -262,26 +262,6 @@ Available on the [Open VSX Registry](https://open-vsx.org/extension/marwa-zara/i
 
 <br/>
 
-```
-  v0.1.4  ──  Session data stored in VS Code private global storage.
-              No more accidental commits of a data/ folder.
-
-  v0.1.3  ──  Alert timestamps now correct on all platforms.
-              Night alert cooldown raised to 30 minutes.
-
-  v0.1.2  ──  Marketplace listing README updated.
-
-  v0.1.1  ──  Marketplace icon fixed. README rewritten for end users.
-              Night alert false positive threshold raised to 15 minutes.
-              Night-time window corrected to 22:00–04:59.
-
-  v0.1.0  ──  First release. 18 behavioral signals, 20 scoring rules,
-              personal baseline, live dashboard, full alert system.
-```
-
-→ Full details in [CHANGELOG.md](CHANGELOG.md)
-
-<br/>
 
 ---
 
