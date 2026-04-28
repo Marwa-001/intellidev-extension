@@ -1,46 +1,46 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs     from 'fs';
+import * as path   from 'path';
 import { BaselineManager, FeatureMetrics, ScoredSession } from './Baselinemanager';
 
 // Interfaces
 
 interface FeatureData extends FeatureMetrics {
-  session_id?: string;
-  datetime?: string;
-  cognitive_score?: number;
-  score_label?: string;
-  typing_score?: number;
-  error_score?: number;
-  context_score?: number;
-  session_score?: number;
-  baseline_score?: number | null;
-  baseline_label?: string | null;
-  deviation_summary?: string | null;
-  is_calibrating?: boolean;
+  session_id?:           string;
+  datetime?:             string;
+  cognitive_score?:      number;
+  score_label?:          string;
+  typing_score?:         number;
+  error_score?:          number;
+  context_score?:        number;
+  session_score?:        number;
+  baseline_score?:       number | null;
+  baseline_label?:       string | null;
+  deviation_summary?:    string | null;
+  is_calibrating?:       boolean;
   calibration_progress?: number;
 }
 
 interface AlertData {
-  alert_id?: string;
-  timestamp?: string;
-  session_id?: string;
-  score?: number;
+  alert_id?:    string;
+  timestamp?:   string;
+  session_id?:  string;
+  score?:       number;
   level_label?: string;
   level_emoji?: string;
-  alert_type?: string;
-  message?: string;
+  alert_type?:  string;
+  message?:     string;
 }
 
 interface PeriodStats {
-  label: string;
-  avgScore: number;
-  avgKpm: number;
+  label:        string;
+  avgScore:     number;
+  avgKpm:       number;
   avgErrorRate: number;
-  avgDeepWork: number;
-  avgSwitches: number;
+  avgDeepWork:  number;
+  avgSwitches:  number;
   sessionCount: number;
-  totalHours: number;
+  totalHours:   number;
 }
 
 // Dashboard Provider
@@ -48,27 +48,27 @@ interface PeriodStats {
 export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellidev.dashboard';
 
-  private _view?: vscode.WebviewView;
-  private _refreshInterval?: NodeJS.Timeout;
+  private _view?:             vscode.WebviewView;
+  private _refreshInterval?:  NodeJS.Timeout;
   private readonly REFRESH_MS = 30_000;
 
   private readonly _featuresDir: string;
-  private readonly _alertsDir: string;
+  private readonly _alertsDir:   string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _baseline: BaselineManager,
-    dataDir: string,
+    private readonly _baseline:     BaselineManager,
+    dataDir:                         string,
   ) {
     this._featuresDir = path.join(dataDir, 'features');
-    this._alertsDir = path.join(dataDir, 'alerts');
+    this._alertsDir   = path.join(dataDir, 'alerts');
     this._baseline.setFeaturesDir(this._featuresDir);
   }
 
   resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    _ctx: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken,
+    webviewView:  vscode.WebviewView,
+    _ctx:         vscode.WebviewViewResolveContext,
+    _token:       vscode.CancellationToken,
   ): void {
     this._view = webviewView;
 
@@ -79,15 +79,13 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlContent(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(msg => {
-      if (msg.command === 'ready') { this._sendData(); }
-      if (msg.command === 'refresh') { this._sendData(); }
+      if (msg.command === 'refresh')           { this._sendData(); }
       if (msg.command === 'deleteSessionData') { this._handleDelete('sessions'); }
-      if (msg.command === 'resetBaseline') { this._handleDelete('baseline'); }
-      if (msg.command === 'fullWipe') { this._handleDelete('full'); }
+      if (msg.command === 'resetBaseline')     { this._handleDelete('baseline'); }
+      if (msg.command === 'fullWipe')          { this._handleDelete('full'); }
     });
 
-    // Initial send data with a slight delay as a fallback to the 'ready' message
-    setTimeout(() => this._sendData(), 100);
+    this._sendData();
 
     this._refreshInterval = setInterval(() => {
       if (webviewView.visible) { this._sendData(); }
@@ -121,23 +119,23 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   private _buildPeriodStats(features: FeatureData[]): {
     weekly: PeriodStats[]; monthly: PeriodStats[];
   } {
-    const now = new Date();
-    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const now       = new Date();
+    const startOf   = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const weekMs    = 7 * 24 * 60 * 60 * 1000;
     const todayStart = startOf(now);
 
     const weekBuckets = Array.from({ length: 4 }, (_, w) => {
-      const to = todayStart - w * weekMs + (w === 0 ? 86_400_000 : 0);
+      const to   = todayStart - w * weekMs + (w === 0 ? 86_400_000 : 0);
       const from = to - weekMs;
-      const lbl = w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`;
+      const lbl  = w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`;
       return { label: lbl, from, to };
     });
 
     const monthBuckets = Array.from({ length: 3 }, (_, m) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      const d    = new Date(now.getFullYear(), now.getMonth() - m, 1);
       const from = d.getTime();
-      const to = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
-      const lbl = m === 0 ? 'This Month'
+      const to   = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+      const lbl  = m === 0 ? 'This Month'
         : d.toLocaleString('default', { month: 'short', year: '2-digit' });
       return { label: lbl, from, to };
     });
@@ -153,21 +151,21 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
       const avg = (key: keyof FeatureData) =>
         inBucket.reduce((a, f) => a + ((f[key] as number) || 0), 0) / inBucket.length;
       return {
-        label: bucket.label,
-        avgScore: Math.round(avg('cognitive_score')),
-        avgKpm: Math.round(avg('avg_kpm')),
+        label:        bucket.label,
+        avgScore:     Math.round(avg('cognitive_score')),
+        avgKpm:       Math.round(avg('avg_kpm')),
         avgErrorRate: parseFloat(avg('avg_error_rate').toFixed(1)),
-        avgDeepWork: Math.round(avg('longest_deep_work_minutes')),
-        avgSwitches: parseFloat(avg('avg_switch_frequency').toFixed(1)),
+        avgDeepWork:  Math.round(avg('longest_deep_work_minutes')),
+        avgSwitches:  parseFloat(avg('avg_switch_frequency').toFixed(1)),
         sessionCount: inBucket.length,
-        totalHours: parseFloat(
+        totalHours:   parseFloat(
           (inBucket.reduce((a, f) => a + (f.session_duration_minutes ?? 0), 0) / 60).toFixed(1)
         ),
       };
     };
 
     return {
-      weekly: weekBuckets.map(aggregate).filter(p => p.sessionCount > 0),
+      weekly:  weekBuckets.map(aggregate).filter(p => p.sessionCount > 0),
       monthly: monthBuckets.map(aggregate).filter(p => p.sessionCount > 0),
     };
   }
@@ -187,13 +185,13 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
             fs.readFileSync(path.join(this._featuresDir, file), 'utf-8')
           ) as FeatureData;
 
-          const sid = file.replace('_features.json', '');
+          const sid     = file.replace('_features.json', '');
           data.session_id = sid;
 
           try {
-            const p = sid.replace('session_', '');
-            const [dp, tp] = p.split('_');
-            data.datetime = new Date(
+            const p         = sid.replace('session_', '');
+            const [dp, tp]  = p.split('_');
+            data.datetime   = new Date(
               parseInt(dp.slice(0, 4)),
               parseInt(dp.slice(4, 6)) - 1,
               parseInt(dp.slice(6, 8)),
@@ -206,11 +204,11 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
           }
 
           if (data.cognitive_score === undefined) { data.cognitive_score = 0; }
-          if (data.score_label === undefined) { data.score_label = this._rawLabel(0); }
-          if (data.typing_score === undefined) { data.typing_score = 0; }
-          if (data.error_score === undefined) { data.error_score = 0; }
-          if (data.context_score === undefined) { data.context_score = 0; }
-          if (data.session_score === undefined) { data.session_score = 0; }
+          if (data.score_label     === undefined) { data.score_label     = this._rawLabel(0); }
+          if (data.typing_score    === undefined) { data.typing_score    = 0; }
+          if (data.error_score     === undefined) { data.error_score     = 0; }
+          if (data.context_score   === undefined) { data.context_score   = 0; }
+          if (data.session_score   === undefined) { data.session_score   = 0; }
 
           raw.push(data);
         } catch { /* skip malformed file */ }
@@ -236,10 +234,10 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
       const scored: ScoredSession = this._baseline.scoreSession(
         this._toMetrics(f), f.cognitive_score ?? 0
       );
-      f.baseline_score = scored.baselineScore;
-      f.baseline_label = scored.baselineLabel;
-      f.deviation_summary = scored.deviationSummary;
-      f.is_calibrating = scored.isCalibrating;
+      f.baseline_score       = scored.baselineScore;
+      f.baseline_label       = scored.baselineLabel;
+      f.deviation_summary    = scored.deviationSummary;
+      f.is_calibrating       = scored.isCalibrating;
       f.calibration_progress = scored.calibrationProgress;
       return f;
     });
@@ -247,21 +245,21 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
 
   private _toMetrics(f: FeatureData): FeatureMetrics {
     return {
-      avg_kpm: f.avg_kpm ?? 0,
-      typing_variability: f.typing_variability ?? 0,
-      backspace_rate: f.backspace_rate ?? 0,
-      pause_count: f.pause_count ?? 0,
-      avg_error_rate: f.avg_error_rate ?? 0,
-      max_error_rate: f.max_error_rate ?? 0,
-      error_burst_count: f.error_burst_count ?? 0,
-      debug_session_count: f.debug_session_count ?? 0,
-      avg_switch_frequency: f.avg_switch_frequency ?? 0,
-      rapid_switch_count: f.rapid_switch_count ?? 0,
-      avg_unique_files: f.avg_unique_files ?? 0,
-      session_duration_minutes: f.session_duration_minutes ?? 0,
-      idle_ratio: f.idle_ratio ?? 0,
+      avg_kpm:                   f.avg_kpm                   ?? 0,
+      typing_variability:        f.typing_variability        ?? 0,
+      backspace_rate:            f.backspace_rate            ?? 0,
+      pause_count:               f.pause_count               ?? 0,
+      avg_error_rate:            f.avg_error_rate            ?? 0,
+      max_error_rate:            f.max_error_rate            ?? 0,
+      error_burst_count:         f.error_burst_count         ?? 0,
+      debug_session_count:       f.debug_session_count       ?? 0,
+      avg_switch_frequency:      f.avg_switch_frequency      ?? 0,
+      rapid_switch_count:        f.rapid_switch_count        ?? 0,
+      avg_unique_files:          f.avg_unique_files          ?? 0,
+      session_duration_minutes:  f.session_duration_minutes  ?? 0,
+      idle_ratio:                f.idle_ratio                ?? 0,
       longest_deep_work_minutes: f.longest_deep_work_minutes ?? 0,
-      night_time_minutes: f.night_time_minutes ?? 0,
+      night_time_minutes:        f.night_time_minutes        ?? 0,
     };
   }
 
@@ -293,34 +291,30 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   }
 
   private _sendData(): void {
-    try {
-      if (!this._view) { return; }
+    if (!this._view) { return; }
 
-      const features = this._loadFeatures();
-      const alerts = this._loadAlerts();
-      const periodStats = this._buildPeriodStats(features);
-      const baselineInfo = {
-        isCalibrated: this._baseline.isCalibrated,
-        calibrationSessions: this._baseline.calibrationSessions,
-        calibrationHours: Math.round(this._baseline.calibrationHours * 10) / 10,
-        calibrationProgress: Math.round(this._baseline.calibrationProgress * 100),
-        minSessions: this._baseline.minSessions,
-        minHours: this._baseline.minHours,
-        baselineLockedAt: this._baseline.baseline?.lockedAt ?? null,
-        baselineUpdatedAt: this._baseline.baseline?.lastUpdatedAt ?? null,
-      };
+    const features     = this._loadFeatures();
+    const alerts       = this._loadAlerts();
+    const periodStats  = this._buildPeriodStats(features);
+    const baselineInfo = {
+      isCalibrated:        this._baseline.isCalibrated,
+      calibrationSessions: this._baseline.calibrationSessions,
+      calibrationHours:    Math.round(this._baseline.calibrationHours * 10) / 10,
+      calibrationProgress: Math.round(this._baseline.calibrationProgress * 100),
+      minSessions:         this._baseline.minSessions,
+      minHours:            this._baseline.minHours,
+      baselineLockedAt:    this._baseline.baseline?.lockedAt    ?? null,
+      baselineUpdatedAt:   this._baseline.baseline?.lastUpdatedAt ?? null,
+    };
 
-      this._view.webview.postMessage({
-        command: 'update',
-        features,
-        alerts,
-        baselineInfo,
-        periodStats,
-        lastUpdated: new Date().toLocaleTimeString(),
-      });
-    } catch (err) {
-      console.error('[IntelliDev] Failed to send dashboard data:', err);
-    }
+    this._view.webview.postMessage({
+      command:     'update',
+      features,
+      alerts,
+      baselineInfo,
+      periodStats,
+      lastUpdated: new Date().toLocaleTimeString(),
+    });
   }
 
   private _getHtmlContent(_webview: vscode.Webview): string {
@@ -329,9 +323,9 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${_webview.cspSource} 'unsafe-inline'; script-src ${_webview.cspSource} 'unsafe-inline'; img-src ${_webview.cspSource} data: https:; font-src ${_webview.cspSource};">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<style>
+<style nonce="${nonce}">
 :root{--teal:#00B4D8;--pink:#FF4B7D;--orange:#FF8C42;--green:#1ABC9C;--yellow:#F39C12;--red:#E74C3C;--border:rgba(0,180,216,.2)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:var(--vscode-sideBar-background,#0D1117);overflow-x:hidden}
@@ -352,7 +346,6 @@ body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:v
 .sec::after{content:'';flex:1;height:1px;background:var(--border)}
 .info-btn{background:none;border:1px solid rgba(0,180,216,.35);color:rgba(0,180,216,.7);border-radius:50%;width:14px;height:14px;font-size:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;line-height:1;padding:0;font-weight:700}
 .info-btn:hover{background:rgba(0,180,216,.15);color:var(--teal);border-color:var(--teal)}
-.sec-desc{padding:1px 12px 6px;font-size:10px;color:#8B949E;line-height:1.5;font-style:italic}
 
 /* Info popover */
 .info-pop{display:none;position:relative;margin:0 10px 6px;padding:9px 11px;background:rgba(0,20,30,.92);border:1px solid rgba(0,180,216,.3);border-radius:6px;font-size:10px;color:#C9D1D9;line-height:1.65;z-index:10}
@@ -461,26 +454,14 @@ body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:v
   <button class="rbtn" id="rbtn" title="Refresh">↻</button>
 </div>
 <div class="ts" id="ts">Loading…</div>
-
 <div id="content">
   <div class="empty"><div class="ico">🧠</div><p>Waiting for session data…</p></div>
 </div>
-<script>
-(function() {
-  try {
-    const vscode = acquireVsCodeApi();
-    
-    // Immediate ready signal
-    vscode.postMessage({ command: 'ready' });
 
+<script nonce="${nonce}">
+const vscode = acquireVsCodeApi();
 const rbtn = document.getElementById('rbtn');
-if (rbtn) {
-  rbtn.addEventListener('click', () => { 
-    rbtn.classList.add('spin'); 
-    vscode.postMessage({command:'refresh'}); 
-    setTimeout(()=>rbtn.classList.remove('spin'),800); 
-  });
-}
+rbtn.addEventListener('click', () => { rbtn.classList.add('spin'); vscode.postMessage({command:'refresh'}); setTimeout(()=>rbtn.classList.remove('spin'),800); });
 
 let periodMode = 'weekly';
 let dangerOpen  = false;
@@ -623,125 +604,70 @@ function drawGauge(canvasId, score, label){
 }
 
 function drawTrend(features){
-  const ctx=mkCtx('c_trend',140); if(!ctx||features.length<2) return;
-  const {_w:w,_h:h}=ctx, pad={l:34,r:14,t:14,b:14};
+  const ctx=mkCtx('c_trend',80); if(!ctx||features.length<2) return;
+  const {_w:w,_h:h}=ctx, pad={l:6,r:6,t:10,b:10};
   const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
   const scores=features.map(f=>f.baseline_score!=null?f.baseline_score:(f.cognitive_score||0));
   const step=cw/(scores.length-1);
   const px=i=>pad.l+i*step, py=v=>pad.t+ch-(v/100)*ch;
 
-  // Zone backgrounds
-  [[0,30,'rgba(26,188,156,.05)'],[30,60,'rgba(243,156,18,.05)'],[60,80,'rgba(255,140,66,.06)'],[80,100,'rgba(255,75,125,.06)']].forEach(([f,t,c])=>{
-    ctx.fillStyle=c; ctx.fillRect(pad.l,py(t),cw,py(f)-py(t));
-  });
-
-  // Y-axis ticks and grid
-  [0,25,50,75,100].forEach(v=>{
-    const y=py(v);
+  // Threshold bands with labels
+  const thresholds = [{v:80,c:'rgba(255,75,125,.55)',lbl:'Burnout 80'},{v:60,c:'rgba(255,140,66,.5)',lbl:'High 60'},{v:30,c:'rgba(243,156,18,.35)',lbl:'Mild 30'}];
+  thresholds.forEach(({v,c,lbl})=>{
+    const y=py(v); ctx.setLineDash([6,4]);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
-    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle='#8B949E';
-    ctx.fillText(v,pad.l-4,y+3);
+    ctx.strokeStyle=c; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle=c.replace(/,[^)]+\)/,',0.9)');
+    ctx.fillText(lbl, pad.l+cw-1, y-2);
   });
 
-  // Zone labels on right edge
-  [[15,'Stable','#1ABC9C'],[45,'Mild','#F39C12'],[70,'High','#FF8C42'],[90,'Risk','#FF4B7D']].forEach(([v,lbl,c])=>{
-    ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle=c;
-    ctx.globalAlpha=0.45; ctx.fillText(lbl,pad.l+2,py(v)+3); ctx.globalAlpha=1;
-  });
-
-  // Line
+  ctx.setLineDash([3,4]);
   ctx.beginPath(); scores.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
-  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
-
-  // Dots
+  ctx.strokeStyle='#00B4D8'; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.stroke(); ctx.setLineDash([]);
   scores.forEach((v,i)=>{
     ctx.beginPath(); ctx.arc(px(i),py(v),4,0,Math.PI*2);
     ctx.fillStyle=scoreColor(v); ctx.fill();
     ctx.beginPath(); ctx.arc(px(i),py(v),4,0,Math.PI*2);
-    ctx.strokeStyle='#0D1117'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.strokeStyle='#0D1117'; ctx.lineWidth=1; ctx.stroke();
   });
-
-  // Value label on latest point
-  const lastV=scores[scores.length-1], lx=px(scores.length-1), ly=py(lastV);
-  ctx.font='bold 9px monospace'; ctx.fillStyle=scoreColor(lastV);
-  ctx.textAlign=scores.length>1?'left':'center';
-  ctx.fillText(lastV,lx+(scores.length>1?6:0),ly-6);
-
-  // Y-axis title
-  ctx.save(); ctx.translate(8,pad.t+ch/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.fillStyle='#8B949E'; ctx.font='7px sans-serif';
-  ctx.fillText('Score (0=best, 100=worst)',0,0); ctx.restore();
 }
 
 function drawBreakdown(features){
-  const ctx=mkCtx('c_break',130); if(!ctx||!features.length) return;
-  const {_w:w,_h:h}=ctx, pad={l:34,r:6,t:10,b:20};
+  const ctx=mkCtx('c_break',90); if(!ctx||!features.length) return;
+  const {_w:w,_h:h}=ctx, pad={l:28,r:6,t:8,b:18};
   const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
   const n=features.length, bw=Math.max(5,Math.min(20,cw/n-4)), gap=(cw-n*bw)/(n+1);
-  const cats=[['typing_score','#00B4D8','Typing'],['error_score','#FF4B7D','Errors'],['context_score','#F39C12','Context'],['session_score','#FF8C42','Session']];
-
-  // Calculate max stacked value for proper scaling
-  let maxStack=0;
-  features.forEach(f=>{ let s=0; cats.forEach(([k])=>{ s+=(f[k]||0); }); if(s>maxStack) maxStack=s; });
-  maxStack=Math.max(maxStack,100);
-
-  // Y-axis ticks
-  const tickStep=maxStack<=100?25:50;
-  for(let v=0;v<=maxStack;v+=tickStep){
-    const y=pad.t+ch-(v/maxStack)*ch;
-    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
-    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle='#8B949E';
-    ctx.fillText(v,pad.l-4,y+3);
-  }
-
-  // Bars
+  const cats=[['typing_score','#00B4D8'],['error_score','#FF4B7D'],['context_score','#F39C12'],['session_score','#FF8C42']];
   features.forEach((f,i)=>{
     let base=pad.t+ch;
-    let total=0;
-    cats.forEach(([k,col])=>{ const v=f[k]||0; total+=v; const bh=(v/maxStack)*ch; ctx.fillStyle=col; ctx.fillRect(pad.l+gap+i*(bw+gap),base-bh,bw,bh); base-=bh; });
-    // Total label on top of bar
-    if(n<=15 || i===n-1){
-      ctx.font='bold 7px monospace'; ctx.textAlign='center'; ctx.fillStyle='#C9D1D9';
-      ctx.fillText(Math.round(total),pad.l+gap+i*(bw+gap)+bw/2,base-3);
-    }
+    cats.forEach(([k,col])=>{ const v=f[k]||0, bh=(v/100)*ch; ctx.fillStyle=col; ctx.fillRect(pad.l+gap+i*(bw+gap),base-bh,bw,bh); base-=bh; });
   });
-
-  // Y-axis title
-  ctx.save(); ctx.translate(8,pad.t+ch/2); ctx.rotate(-Math.PI/2);
+  ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.3)';
+  [0,50,100,150].forEach(v=>{ const y=pad.t+ch-(v/180)*ch; if(y<pad.t) return;
+    ctx.fillText(v,pad.l-3,y+3); ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
+    ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.stroke(); });
+  // Y-axis label
+  ctx.save(); ctx.translate(7,pad.t+ch/2); ctx.rotate(-Math.PI/2);
   ctx.textAlign='center'; ctx.fillStyle='#8B949E'; ctx.font='7px sans-serif';
-  ctx.fillText('Strain Points',0,0); ctx.restore();
-
-  // X-axis dates
-  ctx.textAlign='center'; ctx.fillStyle='#8B949E'; ctx.font='8px monospace';
-  features.forEach((f,i)=>{ if(n<=8||i%2===0) ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(bw+gap)+bw/2,h-4); });
+  ctx.fillText('pts',0,0); ctx.restore();
+  ctx.textAlign='center'; ctx.fillStyle='#8B949E';
+  features.forEach((f,i)=>{ if(i%2!==0) return; ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(bw+gap)+bw/2,h-4); });
 }
 
 function drawErrors(features){
-  const ctx=mkCtx('c_err',130); if(!ctx||features.length<2) return;
-  const {_w:w,_h:h}=ctx, pad={l:34,r:6,t:12,b:14};
+  const ctx=mkCtx('c_err',80); if(!ctx||features.length<2) return;
+  const {_w:w,_h:h}=ctx, pad={l:6,r:6,t:10,b:10};
   const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
   const avg=features.map(f=>f.avg_error_rate||0), peak=features.map(f=>f.max_error_rate||0);
   const maxV=Math.max(...avg,...peak,15), step=cw/(features.length-1);
   const px=i=>pad.l+i*step, py=v=>pad.t+ch-(v/maxV)*ch;
 
-  // Y-axis ticks
-  const yStep=maxV<=15?5:maxV<=30?10:20;
-  for(let v=0;v<=maxV;v+=yStep){
-    const y=py(v);
-    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
-    ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle='#8B949E';
-    ctx.fillText(v,pad.l-4,y+3);
-  }
-
-  // Threshold line at 5 errors/window
+  // Threshold line at 5 errors/window with label
   const ty=py(5); ctx.setLineDash([5,3]);
   ctx.beginPath(); ctx.moveTo(pad.l,ty); ctx.lineTo(pad.l+cw,ty);
   ctx.strokeStyle='rgba(243,156,18,.75)'; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
   ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(243,156,18,.9)';
-  ctx.fillText('⚠ Warning (5/window)', pad.l+2, ty-2);
+  ctx.fillText('threshold (5/window)', pad.l+2, ty-2);
 
   // Second threshold at 12
   if(maxV>10){
@@ -749,15 +675,15 @@ function drawErrors(features){
     ctx.beginPath(); ctx.moveTo(pad.l,ty2); ctx.lineTo(pad.l+cw,ty2);
     ctx.strokeStyle='rgba(255,75,125,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
     ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='rgba(255,75,125,.8)';
-    ctx.fillText('🔴 Critical (12)', pad.l+2, ty2-2);
+    ctx.fillText('critical (12)', pad.l+2, ty2-2);
   }
 
-  const gp=ctx.createLinearGradient(0,pad.t,0,pad.t+ch); gp.addColorStop(0,'rgba(255,140,66,.2)'); gp.addColorStop(1,'rgba(255,140,66,0)');
+  const gp=ctx.createLinearGradient(0,pad.t,0,h); gp.addColorStop(0,'rgba(255,140,66,.2)'); gp.addColorStop(1,'rgba(255,140,66,0)');
   ctx.beginPath(); peak.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
-  ctx.lineTo(px(features.length-1),pad.t+ch); ctx.lineTo(px(0),pad.t+ch); ctx.closePath(); ctx.fillStyle=gp; ctx.fill();
-  const ga=ctx.createLinearGradient(0,pad.t,0,pad.t+ch); ga.addColorStop(0,'rgba(255,75,125,.4)'); ga.addColorStop(1,'rgba(255,75,125,0)');
+  ctx.lineTo(px(features.length-1),h); ctx.lineTo(px(0),h); ctx.closePath(); ctx.fillStyle=gp; ctx.fill();
+  const ga=ctx.createLinearGradient(0,pad.t,0,h); ga.addColorStop(0,'rgba(255,75,125,.4)'); ga.addColorStop(1,'rgba(255,75,125,0)');
   ctx.beginPath(); avg.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
-  ctx.lineTo(px(features.length-1),pad.t+ch); ctx.lineTo(px(0),pad.t+ch); ctx.closePath(); ctx.fillStyle=ga; ctx.fill();
+  ctx.lineTo(px(features.length-1),h); ctx.lineTo(px(0),h); ctx.closePath(); ctx.fillStyle=ga; ctx.fill();
   ctx.setLineDash([5,4]);
   ctx.beginPath(); peak.forEach((v,i)=>{ i?ctx.lineTo(px(i),py(v)):ctx.moveTo(px(i),py(v)); });
   ctx.strokeStyle='#FF8C42'; ctx.lineWidth=1.5; ctx.stroke(); ctx.setLineDash([]);
@@ -765,146 +691,91 @@ function drawErrors(features){
   ctx.strokeStyle='#FF4B7D'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
   avg.forEach((v,i)=>{ ctx.beginPath(); ctx.arc(px(i),py(v),3,0,Math.PI*2); ctx.fillStyle='#FF4B7D'; ctx.fill(); });
 
-  // Latest value annotation
-  const lastAvg=avg[avg.length-1];
-  ctx.font='bold 8px monospace'; ctx.textAlign='left'; ctx.fillStyle='#FF4B7D';
-  ctx.fillText(lastAvg.toFixed(1),px(features.length-1)+5,py(lastAvg)+3);
-
-  // Y-axis title
-  ctx.save(); ctx.translate(8,pad.t+ch/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.fillStyle='#8B949E'; ctx.font='7px sans-serif';
-  ctx.fillText('Errors per 10 min',0,0); ctx.restore();
+  // Y-axis label
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#8B949E';
+  ctx.fillText('errors/10 min', pad.l, h-1);
 }
 
 function drawContext(features){
-  const ctx=mkCtx('c_ctx',130); if(!ctx||!features.length) return;
-  const {_w:w,_h:h}=ctx, pad={l:34,r:34,t:10,b:20};
+  const ctx=mkCtx('c_ctx',88); if(!ctx||!features.length) return;
+  const {_w:w,_h:h}=ctx, pad={l:6,r:6,t:8,b:18};
   const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
   const n=features.length, bw=Math.max(5,Math.min(18,cw/n-4)), gap=(cw-n*bw)/(n+1);
   const freqs=features.map(f=>f.avg_switch_frequency||0), rapids=features.map(f=>f.rapid_switch_count||0);
-  const maxF=Math.max(...freqs,8), maxR=Math.max(...rapids,1);
+  const maxF=Math.max(...freqs,1), maxR=Math.max(...rapids,1);
 
-  // Left Y-axis ticks (Switch frequency)
-  const fStep=maxF<=10?2:maxF<=20?5:10;
-  for(let v=0;v<=maxF;v+=fStep){
-    const y=pad.t+ch-(v/maxF)*ch;
-    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
-    ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle='#00B4D8';
-    ctx.fillText(v,pad.l-4,y+3);
-  }
-
-  // Right Y-axis ticks (Rapid switches)
-  const rStep=maxR<=5?1:maxR<=15?5:10;
-  for(let v=0;v<=maxR;v+=rStep){
-    const y=pad.t+ch-(v/maxR)*ch;
-    ctx.font='8px monospace'; ctx.textAlign='left'; ctx.fillStyle='#FF4B7D';
-    ctx.fillText(v,pad.l+cw+4,y+3);
-  }
-
-  // Threshold lines
-  const thresh8 = pad.t+ch-(8/maxF)*ch;
-  if(thresh8 > pad.t && 8 <= maxF){
+  // Threshold lines for switch frequency
+  const thresh8 = pad.t+ch-(8/Math.max(maxF,16))*ch;
+  const thresh15 = pad.t+ch-(15/Math.max(maxF,16))*ch;
+  if(thresh8 > pad.t){
     ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(pad.l,thresh8); ctx.lineTo(pad.l+cw,thresh8);
     ctx.strokeStyle='rgba(243,156,18,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
     ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(243,156,18,.75)';
-    ctx.fillText('>8 = adds strain', pad.l+cw-1, thresh8-2);
+    ctx.fillText('>8 mild', pad.l+cw-1, thresh8-2);
+  }
+  if(thresh15 > pad.t){
+    ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(pad.l,thresh15); ctx.lineTo(pad.l+cw,thresh15);
+    ctx.strokeStyle='rgba(255,140,66,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(255,140,66,.8)';
+    ctx.fillText('>15 high', pad.l+cw-1, thresh15-2);
   }
 
-  // Bars
   features.forEach((_,i)=>{ const bh=(freqs[i]/maxF)*ch; ctx.fillStyle='rgba(0,180,216,.75)'; ctx.fillRect(pad.l+gap+i*(bw+gap),pad.t+ch-bh,bw,bh); });
-
-  // Rapid switch line
   ctx.beginPath(); rapids.forEach((v,i)=>{ const x=pad.l+gap+i*(bw+gap)+bw/2, y=pad.t+ch-(v/maxR)*ch; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
   ctx.strokeStyle='#FF4B7D'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
   rapids.forEach((v,i)=>{ const x=pad.l+gap+i*(bw+gap)+bw/2, y=pad.t+ch-(v/maxR)*ch;
     ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.fillStyle='#FF4B7D'; ctx.fill();
     ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.strokeStyle='#0D1117'; ctx.lineWidth=1.5; ctx.stroke(); });
 
-  // X-axis dates
   ctx.font='8px monospace'; ctx.textAlign='center'; ctx.fillStyle='#8B949E';
-  features.forEach((f,i)=>{ if(n<=8||i%2===0) ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(bw+gap)+bw/2,h-4); });
+  features.forEach((f,i)=>{ if(i%2!==0) return; ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(bw+gap)+bw/2,h-4); });
 
-  // Axis titles
-  ctx.save(); ctx.translate(8,pad.t+ch/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.fillStyle='#00B4D8'; ctx.font='7px sans-serif';
-  ctx.fillText('Switches/10min',0,0); ctx.restore();
-  ctx.save(); ctx.translate(w-6,pad.t+ch/2); ctx.rotate(Math.PI/2);
-  ctx.textAlign='center'; ctx.fillStyle='#FF4B7D'; ctx.font='7px sans-serif';
-  ctx.fillText('Rapid (<5s)',0,0); ctx.restore();
+  // Y-axis units
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#8B949E';
+  ctx.fillText('switches/10 min', pad.l, h-1);
 }
 
 function drawDeepWork(features){
-  const ctx=mkCtx('c_dw',130); if(!ctx||!features.length) return;
-  const {_w:w,_h:h}=ctx, pad={l:34,r:6,t:10,b:20};
+  const ctx=mkCtx('c_dw',88); if(!ctx||!features.length) return;
+  const {_w:w,_h:h}=ctx, pad={l:6,r:6,t:8,b:18};
   const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
   const n=features.length, pw=Math.max(8,Math.min(26,cw/n-4)), bw=(pw-2)/2, gap=(cw-n*pw)/(n+1);
   const dw=features.map(f=>f.longest_deep_work_minutes||0);
   const idle=features.map(f=>(f.session_duration_minutes||0)*(f.idle_ratio||0));
-  const maxV=Math.max(...dw,...idle,10);
-
-  // Y-axis ticks
-  const yStep=maxV<=20?5:maxV<=60?10:15;
-  for(let v=0;v<=maxV;v+=yStep){
-    const y=pad.t+ch-(v/maxV)*ch;
-    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
-    ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='8px monospace'; ctx.textAlign='right'; ctx.fillStyle='#8B949E';
-    ctx.fillText(v,pad.l-4,y+3);
-  }
+  const maxV=Math.max(...dw,...idle,1);
 
   // Deep work goal line at 25 minutes
-  if(25<=maxV){
-    const goalY = pad.t+ch-(25/maxV)*ch;
+  const goalY = pad.t+ch-(25/Math.max(maxV,30))*ch;
+  if(goalY > pad.t){
     ctx.setLineDash([5,3]); ctx.beginPath(); ctx.moveTo(pad.l,goalY); ctx.lineTo(pad.l+cw,goalY);
     ctx.strokeStyle='rgba(26,188,156,.5)'; ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
     ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle='rgba(26,188,156,.8)';
-    ctx.fillText('\u2705 goal 25 min', pad.l+cw-1, goalY-2);
+    ctx.fillText('goal 25 min', pad.l+cw-1, goalY-2);
   }
 
-  // Bars with value labels
   features.forEach((f,i)=>{ const x=pad.l+gap+i*(pw+gap);
-    const dwH=(dw[i]/maxV)*ch, idleH=(idle[i]/maxV)*ch;
-    ctx.fillStyle='#1ABC9C'; ctx.fillRect(x,pad.t+ch-dwH,bw,dwH);
-    ctx.fillStyle='#FF8C42'; ctx.fillRect(x+bw+2,pad.t+ch-idleH,bw,idleH);
-    // Value labels on top of bars for latest session
-    if(i===n-1){
-      ctx.font='bold 7px monospace'; ctx.textAlign='center';
-      ctx.fillStyle='#1ABC9C'; ctx.fillText(Math.round(dw[i])+'m',x+bw/2,pad.t+ch-dwH-3);
-      ctx.fillStyle='#FF8C42'; ctx.fillText(Math.round(idle[i])+'m',x+bw+2+bw/2,pad.t+ch-idleH-3);
-    }
-  });
-
-  // X-axis dates
+    ctx.fillStyle='#1ABC9C'; ctx.fillRect(x,pad.t+ch-(dw[i]/maxV)*ch,bw,(dw[i]/maxV)*ch);
+    ctx.fillStyle='#FF8C42'; ctx.fillRect(x+bw+2,pad.t+ch-(idle[i]/maxV)*ch,bw,(idle[i]/maxV)*ch); });
   ctx.font='8px monospace'; ctx.textAlign='center'; ctx.fillStyle='#8B949E';
-  features.forEach((f,i)=>{ if(n<=8||i%2===0) ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(pw+gap)+pw/2,h-4); });
+  features.forEach((f,i)=>{ if(i%2!==0) return; ctx.fillText((f.datetime||'').slice(5,10),pad.l+gap+i*(pw+gap)+pw/2,h-4); });
 
-  // Y-axis title
-  ctx.save(); ctx.translate(8,pad.t+ch/2); ctx.rotate(-Math.PI/2);
-  ctx.textAlign='center'; ctx.fillStyle='#8B949E'; ctx.font='7px sans-serif';
-  ctx.fillText('Minutes',0,0); ctx.restore();
+  // Y-axis units
+  ctx.font='7px sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#8B949E';
+  ctx.fillText('minutes', pad.l, h-1);
 }
 
 function drawHeatmap(features){
-  const ctx=mkCtx('c_heat',130); if(!ctx||!features.length) return;
+  const ctx=mkCtx('c_heat',110); if(!ctx||!features.length) return;
   const {_w:w,_h:h}=ctx;
   const days=[...new Set(features.map(f=>(f.datetime||'').slice(5,10)))];
   const hours=[8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
   if(!days.length) return;
-  const pad={l:32,r:4,t:4,b:20}, cw2=(w-pad.l-pad.r)/days.length, rh=(h-pad.t-pad.b)/hours.length;
+  const pad={l:26,r:4,t:4,b:18}, cw2=(w-pad.l-pad.r)/days.length, rh=(h-pad.t-pad.b)/hours.length;
   const lu={};
   features.forEach(f=>{ const day=(f.datetime||'').slice(5,10), hr=parseInt((f.datetime||'T00').slice(11,13)); lu[day+'_'+hr]=f.cognitive_score||0; });
   function hmc(v){ if(!v) return 'rgba(13,17,23,.8)'; if(v<30) return '#1ABC9C'; if(v<60) return '#F39C12'; if(v<80) return '#FF8C42'; return '#FF4B7D'; }
   hours.forEach((hr,ri)=>{
-    days.forEach((day,ci)=>{
-      const val=lu[day+'_'+hr]||0;
-      ctx.fillStyle=hmc(val); ctx.fillRect(pad.l+ci*cw2+1,pad.t+ri*rh+1,cw2-2,rh-2);
-      // Show score value in cell if cell is large enough
-      if(val>0 && cw2>=20 && rh>=12){
-        ctx.font='bold 7px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(0,0,0,.6)';
-        ctx.fillText(val,pad.l+ci*cw2+cw2/2,pad.t+ri*rh+rh/2+3);
-      }
-    });
+    days.forEach((day,ci)=>{ ctx.fillStyle=hmc(lu[day+'_'+hr]||0); ctx.fillRect(pad.l+ci*cw2+1,pad.t+ri*rh+1,cw2-2,rh-2); });
     ctx.fillStyle='rgba(255,255,255,.35)'; ctx.font='8px monospace'; ctx.textAlign='right';
     ctx.fillText(hr+':00',pad.l-2,pad.t+ri*rh+rh/2+3);
   });
@@ -1013,9 +884,7 @@ document.body.addEventListener('click', function(e) {
 });
 
 window.addEventListener('message', ev => {
-  try {
-    const msg = ev.data;
-    if (!msg || msg.command !== 'update') return;
+  const msg=ev.data; if(msg.command!=='update') return;
   document.getElementById('ts').textContent='Updated: '+msg.lastUpdated+' · auto 30s';
   rbtn.classList.remove('spin');
 
@@ -1096,53 +965,47 @@ window.addEventListener('message', ev => {
     <div class="gauge-wrap"><canvas id="c_gauge"></canvas></div>
     \${secHtml('Score Trend', 'trend')}
     \${infoPopHtml('trend')}
-    <div class="sec-desc">How your cognitive load changes over sessions — lower scores = better focus</div>
     <div class="cw"><canvas id="c_trend"></canvas>
       <div class="xlbl"><span>\${xL}</span><span>\${xR}</span></div>
     </div>
     \${secHtml('Score Breakdown by Category', 'break')}
     \${infoPopHtml('break')}
-    <div class="sec-desc">What's contributing to your cognitive load — taller bars = more strain from that source</div>
     <div class="cw"><canvas id="c_break"></canvas>
       <div class="leg">
-        <span><span class="ld" style="background:#00B4D8"></span>Typing rhythm</span>
-        <span><span class="ld" style="background:#FF4B7D"></span>Code errors</span>
-        <span><span class="ld" style="background:#F39C12"></span>File switching</span>
-        <span><span class="ld" style="background:#FF8C42"></span>Session length</span>
+        <span><span class="ld" style="background:#00B4D8"></span>Typing</span>
+        <span><span class="ld" style="background:#FF4B7D"></span>Errors</span>
+        <span><span class="ld" style="background:#F39C12"></span>Context</span>
+        <span><span class="ld" style="background:#FF8C42"></span>Session</span>
       </div>
     </div>
     \${secHtml('Error Density', 'err')}
     \${infoPopHtml('err')}
-    <div class="sec-desc">Compilation/linter errors per 10-min window — stay below the yellow warning line</div>
     <div class="cw"><canvas id="c_err"></canvas>
       <div class="leg">
-        <span><span class="ld" style="background:#FF4B7D"></span>Avg errors per window</span>
-        <span><span class="ld" style="background:#FF8C42;opacity:.8"></span>Peak (worst window)</span>
+        <span><span class="ld" style="background:#FF4B7D"></span>Avg Error Rate</span>
+        <span><span class="ld" style="background:#FF8C42;opacity:.8"></span>Peak Error Rate</span>
       </div>
     </div>
     \${secHtml('Context Switching', 'ctx')}
     \${infoPopHtml('ctx')}
-    <div class="sec-desc">How often you switch files — frequent switching adds cognitive strain</div>
     <div class="cw"><canvas id="c_ctx"></canvas>
       <div class="leg">
-        <span><span class="ld" style="background:#00B4D8;opacity:.75"></span>File switches per 10 min (left axis)</span>
-        <span><span class="ld" style="background:#FF4B7D"></span>Rapid switches under 5s (right axis)</span>
+        <span><span class="ld" style="background:#00B4D8;opacity:.75"></span>Switch Freq/10 min</span>
+        <span><span class="ld" style="background:#FF4B7D"></span>Rapid Switches</span>
       </div>
     </div>
     \${secHtml('Deep Work vs Idle Time', 'dw')}
     \${infoPopHtml('dw')}
-    <div class="sec-desc">Your longest uninterrupted coding block vs idle time — aim for the green goal line</div>
     <div class="cw"><canvas id="c_dw"></canvas>
       <div class="leg">
-        <span><span class="ld" style="background:#1ABC9C"></span>Deep work (longest block)</span>
-        <span><span class="ld" style="background:#FF8C42"></span>Idle time (no typing)</span>
+        <span><span class="ld" style="background:#1ABC9C"></span>Deep Work (min)</span>
+        <span><span class="ld" style="background:#FF8C42"></span>Idle Time (min)</span>
       </div>
     </div>
     \${secHtml('Cognitive Load Heatmap', 'heat')}
     \${infoPopHtml('heat')}
-    <div class="sec-desc">When you code and how loaded you are — find your peak performance hours</div>
     <div class="hmwrap"><canvas id="c_heat"></canvas>
-      <div class="hmleg"><span>Low load (green)</span><div class="hmgrad"></div><span>High load (red)</span></div>
+      <div class="hmleg"><span>Low</span><div class="hmgrad"></div><span>High</span></div>
     </div>
     <div class="sec">Performance Comparison</div>
     \${compTabsHtml}
@@ -1152,31 +1015,16 @@ window.addEventListener('message', ev => {
     \${renderDangerZone()}
   \`;
 
-    requestAnimationFrame(()=>{
-      try {
-        drawGauge('c_gauge', displayScore, displayLabel);
-        drawTrend(features);
-        drawBreakdown(features);
-        drawErrors(features);
-        drawContext(features);
-        drawDeepWork(features);
-        drawHeatmap(features);
-      } catch (err) {
-        console.error('Chart drawing error:', err);
-      }
-    });
-  } catch (err) {
-    console.error('Update handler error:', err);
-  }
+  requestAnimationFrame(()=>{
+    drawGauge('c_gauge', displayScore, displayLabel);
+    drawTrend(features);
+    drawBreakdown(features);
+    drawErrors(features);
+    drawContext(features);
+    drawDeepWork(features);
+    drawHeatmap(features);
+  });
 });
-
-// Signal ready
-vscode.postMessage({ command: 'ready' });
-
-} catch (err) {
-  console.error('CRITICAL STARTUP ERROR:', err);
-}
-})();
 </script>
 </body>
 </html>`;
