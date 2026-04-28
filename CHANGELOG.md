@@ -46,3 +46,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - 90-day automatic pruning of old session files
 - Custom data path setting (intellidev.dataPath) for storing session files in a user-specified location
 - Privacy-first design: all processing runs locally inside VS Code with no external network calls
+
+## [0.1.5] — 2026-04-28
+
+### Fixed
+- README updated
