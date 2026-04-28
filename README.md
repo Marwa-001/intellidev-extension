@@ -93,7 +93,7 @@ These feed a **20-rule scoring engine** across all four categories. The result u
 ```
   0 ──────────── 30 ──────────── 60 ──────────── 80 ─────── 100
   │                │               │               │            │
-  │   🟢 STABLE   │  🟡 MILD      │  🟠 HIGH      │  🔴 RISK  │
+  │   🟢 STABLE   │  🟡 MILD      │  🟠 HIGH      |  🔴 RISK  │
   │   FOCUS        │  STRAIN       │  LOAD         │            │
   │                │               │               │            │
   │  You're in     │  Consider     │  Take a       │  Stop.     │
