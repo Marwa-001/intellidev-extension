@@ -254,14 +254,6 @@ Available on the [Open VSX Registry](https://open-vsx.org/extension/marwa-zara/i
 
 <br/>
 
----
-
-<br/>
-
-## 📋 Changelog Highlights
-
-<br/>
-
 
 ---
 
