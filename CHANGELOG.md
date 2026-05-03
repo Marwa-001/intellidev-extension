@@ -4,6 +4,18 @@ All notable changes to IntelliDev will be documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+
+## [0.1.6] — 2026-05-03
+
+### Fixed
+- Improve dashboard visuals
+
+
+## [0.1.5] — 2026-04-28
+
+### Fixed
+- README updated
+
 ## [0.1.4] — 2026-03-29
 
 ### Fixed
@@ -46,8 +58,3 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - 90-day automatic pruning of old session files
 - Custom data path setting (intellidev.dataPath) for storing session files in a user-specified location
 - Privacy-first design: all processing runs locally inside VS Code with no external network calls
-
-## [0.1.5] — 2026-04-28
-
-### Fixed
-- README updated
