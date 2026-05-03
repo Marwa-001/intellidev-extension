@@ -79,12 +79,14 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlContent(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(msg => {
+      if (msg.command === 'ready')             { this._sendData(); }  // webview JS fully loaded
       if (msg.command === 'refresh')           { this._sendData(); }
       if (msg.command === 'deleteSessionData') { this._handleDelete('sessions'); }
       if (msg.command === 'resetBaseline')     { this._handleDelete('baseline'); }
       if (msg.command === 'fullWipe')          { this._handleDelete('full'); }
     });
 
+    // Also send immediately as a fallback (handles reload/re-focus cases)
     this._sendData();
 
     this._refreshInterval = setInterval(() => {
@@ -293,28 +295,36 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   private _sendData(): void {
     if (!this._view) { return; }
 
-    const features     = this._loadFeatures();
-    const alerts       = this._loadAlerts();
-    const periodStats  = this._buildPeriodStats(features);
-    const baselineInfo = {
-      isCalibrated:        this._baseline.isCalibrated,
-      calibrationSessions: this._baseline.calibrationSessions,
-      calibrationHours:    Math.round(this._baseline.calibrationHours * 10) / 10,
-      calibrationProgress: Math.round(this._baseline.calibrationProgress * 100),
-      minSessions:         this._baseline.minSessions,
-      minHours:            this._baseline.minHours,
-      baselineLockedAt:    this._baseline.baseline?.lockedAt    ?? null,
-      baselineUpdatedAt:   this._baseline.baseline?.lastUpdatedAt ?? null,
-    };
+    try {
+      const features     = this._loadFeatures();
+      const alerts       = this._loadAlerts();
+      const periodStats  = this._buildPeriodStats(features);
+      const baselineInfo = {
+        isCalibrated:        this._baseline.isCalibrated,
+        calibrationSessions: this._baseline.calibrationSessions,
+        calibrationHours:    Math.round(this._baseline.calibrationHours * 10) / 10,
+        calibrationProgress: Math.round(this._baseline.calibrationProgress * 100),
+        minSessions:         this._baseline.minSessions,
+        minHours:            this._baseline.minHours,
+        baselineLockedAt:    this._baseline.baseline?.lockedAt    ?? null,
+        baselineUpdatedAt:   this._baseline.baseline?.lastUpdatedAt ?? null,
+      };
 
-    this._view.webview.postMessage({
-      command:     'update',
-      features,
-      alerts,
-      baselineInfo,
-      periodStats,
-      lastUpdated: new Date().toLocaleTimeString(),
-    });
+      this._view.webview.postMessage({
+        command:     'update',
+        features,
+        alerts,
+        baselineInfo,
+        periodStats,
+        lastUpdated: new Date().toLocaleTimeString(),
+      });
+    } catch (err) {
+      console.error('[IntelliDev] Error in _sendData:', err);
+      this._view.webview.postMessage({
+        command: 'error',
+        message: err instanceof Error ? err.message : String(err)
+      });
+    }
   }
 
   private _getHtmlContent(_webview: vscode.Webview): string {
@@ -463,6 +473,9 @@ const vscode = acquireVsCodeApi();
 const rbtn = document.getElementById('rbtn');
 rbtn.addEventListener('click', () => { rbtn.classList.add('spin'); vscode.postMessage({command:'refresh'}); setTimeout(()=>rbtn.classList.remove('spin'),800); });
 
+// Signal the extension that the webview JS is ready to receive messages
+vscode.postMessage({ command: 'ready' });
+
 let periodMode = 'weekly';
 let dangerOpen  = false;
 
@@ -494,7 +507,7 @@ const CHART_INFO = {
     title: 'Score Trend',
     body: 'Each dot is one session. The score (0–100) measures cognitive strain based on your typing rhythm, error count, file switching, and session length. Lower is better.',
     thresholds: [
-      { color:'#1ABC9C', label:'0–29', desc:'Stable Focus — you\'re in flow' },
+      { color:'#1ABC9C', label:'0–29', desc:"Stable Focus — you're in flow" },
       { color:'#F39C12', label:'30–59', desc:'Mild Strain — consider a break' },
       { color:'#FF8C42', label:'60–79', desc:'High Load — take 10–15 min off' },
       { color:'#FF4B7D', label:'80+',   desc:'Burnout Risk — rest now' },
@@ -530,7 +543,7 @@ const CHART_INFO = {
   },
   dw: {
     title: 'Deep Work vs Idle',
-    body: 'Deep work = the longest continuous block of typing without going idle (2+ min with no activity). Idle time = total minutes where no keystrokes were detected. High idle is fine if you\'re reading or thinking.',
+    body: "Deep work = the longest continuous block of typing without going idle (2+ min with no activity). Idle time = total minutes where no keystrokes were detected. High idle is fine if you're reading or thinking.",
     thresholds: [
       { color:'#1ABC9C', label:'Deep work', desc:'Longest uninterrupted coding block (minutes)' },
       { color:'#FF8C42', label:'Idle time', desc:'Total idle minutes in the session' },
@@ -538,7 +551,7 @@ const CHART_INFO = {
   },
   heat: {
     title: 'Cognitive Load Heatmap',
-    body: 'Each cell = one session. Rows = hour of day, columns = date. Color shows that session\'s cognitive load score. Dark = low load; red = high load. Useful for spotting your peak performance hours.',
+    body: "Each cell = one session. Rows = hour of day, columns = date. Color shows that session's cognitive load score. Dark = low load; red = high load. Useful for spotting your peak performance hours.",
     thresholds: [
       { color:'#1ABC9C', label:'Green (<30)',  desc:'Stable, low cognitive load' },
       { color:'#F39C12', label:'Yellow (<60)', desc:'Mild strain' },
@@ -617,7 +630,7 @@ function drawTrend(features){
     const y=py(v); ctx.setLineDash([6,4]);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cw,y);
     ctx.strokeStyle=c; ctx.lineWidth=1.2; ctx.stroke(); ctx.setLineDash([]);
-    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle=c.replace(/,[^)]+\)/,',0.9)');
+    ctx.font='7px sans-serif'; ctx.textAlign='right'; ctx.fillStyle=c.replace(/,[^)]+\\)/,',0.9)');
     ctx.fillText(lbl, pad.l+cw-1, y-2);
   });
 
@@ -884,7 +897,14 @@ document.body.addEventListener('click', function(e) {
 });
 
 window.addEventListener('message', ev => {
-  const msg=ev.data; if(msg.command!=='update') return;
+  const msg=ev.data; 
+  if(msg.command === 'error') {
+    document.getElementById('ts').textContent = 'Error updating';
+    document.getElementById('content').innerHTML = '<div style="color:red;padding:12px;font-family:monospace;white-space:pre-wrap;">Error: ' + msg.message + '</div>';
+    rbtn.classList.remove('spin');
+    return;
+  }
+  if(msg.command!=='update') return;
   document.getElementById('ts').textContent='Updated: '+msg.lastUpdated+' · auto 30s';
   rbtn.classList.remove('spin');
 
