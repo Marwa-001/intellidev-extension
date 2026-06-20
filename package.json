@@ -2,7 +2,7 @@
   "name": "intellidev",
   "displayName": "IntelliDev",
   "description": "Privacy-preserving cognitive load detection for developers — real-time scoring, personal baseline, and in-editor alerts.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "marwa-zara",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -128,6 +128,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.61.1"
   }
 }

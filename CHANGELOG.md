@@ -5,6 +5,15 @@ All notable changes to IntelliDev will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
+## [0.1.7] — 2026-06-20
+
+### Changed
+- Replaced intrusive VS Code popup alert dialogs (error/warning messages) with non-intrusive **status bar updates**
+- The status bar item now reflects the current cognitive load level in real time: icon, text, and background color all update automatically (orange for High Load ≥ 60, red for Burnout Risk ≥ 80)
+- Hovering over the status bar shows a markdown tooltip with the exact score, level label, and personalised recommendation
+- Alerts continue to be saved to disk and displayed in the **Recent Alerts** panel in the sidebar dashboard — only the popup dialog is removed
+- Pause/resume commands now correctly clear and restore status bar color states
+
 ## [0.1.6] — 2026-05-03
 
 ### Fixed

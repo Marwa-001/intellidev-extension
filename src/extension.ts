@@ -11,6 +11,7 @@ import { IntelliDevDashboardProvider }    from './dashboardProvider';
 import { BaselineManager }                from './Baselinemanager';
 import { BackendEngine }                  from './backend/backendEngine';
 import type { Alert }                     from './backend/alertGenerator';
+import type { ScoringResult }             from './backend/scorer';
 
 // ── Module-level handles 
 let logger:            EventLogger           | undefined;
@@ -54,6 +55,50 @@ function resolveDataPaths(context: vscode.ExtensionContext): {
   return { sessionsDir, dataDir, featuresDir, alertsDir };
 }
 
+// ── Status bar update helper
+// Updates text, icon, color, and tooltip based on the latest score result.
+// When paused, does nothing so the paused state is preserved.
+function updateStatusBar(result: ScoringResult): void {
+  if (!statusBarItem || !isTracking) { return; }
+
+  const score = Math.round(result.capped_score);
+  const label = result.level.label;
+  const emoji = result.level.emoji;
+  const rec   = result.level.recommendation;
+
+  // Pick icon and background color based on score zone
+  let icon: string;
+  let bg: vscode.ThemeColor | undefined;
+
+  if (score < 30) {
+    // Stable Focus — normal pulse, no special background
+    icon = '$(pulse)';
+    bg   = undefined;
+  } else if (score < 60) {
+    // Mild Strain — slightly elevated
+    icon = '$(pulse)';
+    bg   = undefined;
+  } else if (score < 80) {
+    // High Cognitive Load — warning
+    icon = '$(warning)';
+    bg   = new vscode.ThemeColor('statusBarItem.warningBackground');
+  } else {
+    // Burnout Risk — error / urgent
+    icon = '$(error)';
+    bg   = new vscode.ThemeColor('statusBarItem.errorBackground');
+  }
+
+  statusBarItem.text             = `${icon} IntelliDev: ${label} (${score}/100)`;
+  statusBarItem.backgroundColor  = bg;
+  statusBarItem.tooltip          = new vscode.MarkdownString(
+    `**IntelliDev — Cognitive Load**\n\n` +
+    `${emoji} **${label}** — Score: \`${score}/100\`\n\n` +
+    `💡 ${rec}\n\n` +
+    `*Click to open dashboard*`
+  );
+  statusBarItem.command          = 'intellidev.openDashboard';
+}
+
 // ── Activate 
 export function activate(context: vscode.ExtensionContext): void {
   console.log('[IntelliDev] Extension activating…');
@@ -89,17 +134,19 @@ export function activate(context: vscode.ExtensionContext): void {
     alertThreshold: 60,
     cooldownMs:     300_000,
 
+    // Alerts are now surfaced silently via the status bar.
+    // They are still written to the alerts directory (for the dashboard history view)
+    // and logged to the console — only the intrusive popup is removed.
     onAlert: (alert: Alert) => {
-      const msg = `${alert.level_emoji} IntelliDev: ${alert.message}`;
-      if (alert.alert_type === 'burnout_risk') {
-        vscode.window.showErrorMessage(msg);
-      } else {
-        vscode.window.showWarningMessage(msg);
-      }
+      console.log(
+        `[IntelliDev] Alert (${alert.alert_type}): ${alert.level_emoji} ${alert.message}`
+      );
       dashboardProvider?.refresh();
     },
 
-    onScored: (_sessionId, _result) => {
+    onScored: (_sessionId, result: ScoringResult) => {
+      // Update the status bar silently whenever a new score is produced
+      updateStatusBar(result);
       dashboardProvider?.refresh();
     },
   });
@@ -160,9 +207,10 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand('setContext', 'intellidev.paused', true);
 
       if (statusBarItem) {
-        statusBarItem.text    = '$(circle-slash) IntelliDev: Paused';
-        statusBarItem.tooltip = 'IntelliDev tracking paused. Click to resume.';
-        statusBarItem.command = 'intellidev.resumeTracking';
+        statusBarItem.text            = '$(circle-slash) IntelliDev: Paused';
+        statusBarItem.tooltip         = 'IntelliDev tracking paused. Click to resume.';
+        statusBarItem.command         = 'intellidev.resumeTracking';
+        statusBarItem.backgroundColor = undefined; // clear any score-based color
       }
       vscode.window.showInformationMessage('IntelliDev: Tracking paused.');
     }),
@@ -177,10 +225,28 @@ export function activate(context: vscode.ExtensionContext): void {
       // Update context key so the sidebar swaps back to the pause button
       vscode.commands.executeCommand('setContext', 'intellidev.paused', false);
 
+      // Restore the status bar to the last known score if available,
+      // otherwise fall back to the idle default
+      const latest = backendEngine?.getLatestScore();
       if (statusBarItem) {
-        statusBarItem.text    = '$(pulse) IntelliDev';
-        statusBarItem.tooltip = 'IntelliDev: Cognitive load tracking active. Click to open dashboard.';
-        statusBarItem.command = 'intellidev.openDashboard';
+        if (latest) {
+          // Re-apply the last score visually so the bar isn't blank after resuming
+          const score = Math.round(latest.score);
+          let icon    = score < 60 ? '$(pulse)' : score < 80 ? '$(warning)' : '$(error)';
+          let bg: vscode.ThemeColor | undefined =
+            score >= 80 ? new vscode.ThemeColor('statusBarItem.errorBackground') :
+            score >= 60 ? new vscode.ThemeColor('statusBarItem.warningBackground') :
+            undefined;
+          statusBarItem.text            = `${icon} IntelliDev: ${latest.level} (${score}/100)`;
+          statusBarItem.backgroundColor = bg;
+          statusBarItem.tooltip         = 'IntelliDev: Tracking resumed. Click to open dashboard.';
+          statusBarItem.command         = 'intellidev.openDashboard';
+        } else {
+          statusBarItem.text            = '$(pulse) IntelliDev';
+          statusBarItem.tooltip         = 'IntelliDev: Cognitive load tracking active. Click to open dashboard.';
+          statusBarItem.command         = 'intellidev.openDashboard';
+          statusBarItem.backgroundColor = undefined;
+        }
       }
       vscode.window.showInformationMessage('IntelliDev: Tracking resumed.');
     }),

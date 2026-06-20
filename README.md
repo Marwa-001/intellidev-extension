@@ -17,7 +17,7 @@
 
 <br/>
 
-[![Version](https://img.shields.io/badge/version-0.1.4-00B4D8?style=flat-square&labelColor=0D1117)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.7-00B4D8?style=flat-square&labelColor=0D1117)](CHANGELOG.md)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85-4A4A4A?style=flat-square&labelColor=0D1117)](https://code.visualstudio.com)
 [![License](https://img.shields.io/badge/license-MIT-1ABC9C?style=flat-square&labelColor=0D1117)](LICENSE)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20local-FF4B7D?style=flat-square&labelColor=0D1117)]()
@@ -150,20 +150,41 @@ Open the IntelliDev panel from the activity bar. Everything you need is in one p
 
 ## 🔔 Alerts
 
-IntelliDev fires VS Code notifications when your body needs a signal your brain is ignoring.
+IntelliDev surfaces cognitive load signals **non-intrusively** — no sudden popups while you're deep in code. Alerts are delivered in two silent ways:
 
 <br/>
 
-| Trigger | Alert |
-|:--------|:------|
-| Score ≥ 60 | 🟠 &nbsp;Overload warning |
-| Score ≥ 80 | 🔴 &nbsp;Burnout risk — shown as an error notification |
-| 2+ hours continuous | ⏱️ &nbsp;Long session warning |
-| After 10 pm (15 min+) | 🌙 &nbsp;Night coding alert |
+### Status Bar (bottom of VS Code)
+
+The status bar item updates automatically every time a new score is produced. The icon, text, and background color all change based on your current load level:
+
+| Score | Status Bar appearance |
+|:------|:----------------------|
+| 0–29 | `$(pulse) IntelliDev: Stable Focus (24/100)` — no highlight |
+| 30–59 | `$(pulse) IntelliDev: Mild Strain (45/100)` — no highlight |
+| 60–79 | `$(warning) IntelliDev: High Cognitive Load (72/100)` — **orange background** |
+| ≥ 80 | `$(error) IntelliDev: Burnout Risk (85/100)` — **red background** |
+
+Hover over the status bar item at any time to see a **tooltip** with your exact score, load level, and a personalised recommendation — without interrupting your flow.
 
 <br/>
 
-All alerts respect a **5-minute cooldown** so they never spam you. Night alerts use a separate **30-minute cooldown** — nobody wants to be pinged every five minutes at 11 pm.
+### Sidebar Alert History
+
+Every alert is also saved locally and shown in the **Recent Alerts** panel inside the IntelliDev sidebar dashboard. You can review them at your own pace.
+
+<br/>
+
+| Trigger | Alert type |
+|:--------|:-----------|
+| Score ≥ 60 | 🟠 &nbsp;Overload |
+| Score ≥ 80 | 🔴 &nbsp;Burnout risk |
+| 2+ hours continuous | ⏱️ &nbsp;Long session |
+| After 10 pm (15 min+) | 🌙 &nbsp;Night coding |
+
+<br/>
+
+All alerts respect a **5-minute cooldown** so they never flood the history. Night alerts use a separate **30-minute cooldown**.
 
 Alert timestamps always reflect your **local timezone**, including on Windows machines where the VS Code extension host can default to UTC.
 
