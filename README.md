@@ -68,9 +68,19 @@ IntelliDev samples **four behavioral dimensions** continuously while you work:
 
 <br/>
 
-These feed a **20-rule scoring engine** across all four categories. The result updates in real time — no polling delay, no background processes calling home.
+These feed a multi-layered scoring architecture:
+1. **Rule-Based Engine**: Computes scores using 20 heuristics normalized to your coding patterns.
+2. **On-Device ML Scorer**: An online logistic regression classifier (using hand-rolled SGD) that trains incrementally on your sessions. It learns your unique patterns locally and blends its predictions (up to 60% weight) with the rule engine after 15 sessions.
+3. **Temporal Fatigue Analyser**: A rolling cross-session analyzer that monitors score trends using exponential moving averages (EMA). It applies a cumulative fatigue penalty (+5 to +15 pts) for consecutive high-load sessions.
+4. **Reading Mode Dampener**: Automatically detects code-reading/debugging sessions (low typing rate with moderate switches) and dampens context-switching scores to avoid false positives.
 
-<br/>
+---
+
+## 🔬 Advanced Composite Signals
+
+To capture complex coding strain, IntelliDev extracts derived composite features:
+- **Error-to-Type Ratio**: Measures linter/compile error rate relative to typing speed. A fast typer making frequent errors indicates a higher cognitive strain than a slow, methodical typer.
+- **Context Fragmentation**: Computes rapid file switches per minute of active session, capturing fragmentation regardless of session duration.
 
 ---
 
@@ -112,6 +122,7 @@ After **10 sessions** of coding, IntelliDev locks a **personal baseline** calibr
 - 📌 &nbsp;Scores are relative to **your** norm, not a population average
 - ⚡ &nbsp;Fast typers are not penalised for high KPM
 - 🌙 &nbsp;Night owls are not flagged unfairly for late sessions
+- 🤖 &nbsp;**ML Model Activation**: On-device online learning activates automatically after 15 sessions.
 - 🔄 &nbsp;The baseline **auto-recalibrates every 30 sessions** as your patterns evolve
 
 <br/>
@@ -132,15 +143,16 @@ Open the IntelliDev panel from the activity bar. Everything you need is in one p
 
 | Panel | What it shows |
 |:------|:-------------|
-| 📊 &nbsp;**Live gauge** | Current cognitive load score, updated in real time |
-| 📈 &nbsp;**Score trend** | Score history across all your sessions |
-| 🧩 &nbsp;**Category breakdown** | Typing, errors, context, and session contributions |
-| 🔴 &nbsp;**Error density** | Error rate spikes and peaks over time |
-| 🔀 &nbsp;**Context switching** | File switch frequency and rapid-switch patterns |
-| 🎯 &nbsp;**Deep work vs. idle** | Focus blocks compared to idle time per session |
-| 🗓️ &nbsp;**Heatmap** | Cognitive load patterns by time of day |
-| 📅 &nbsp;**Weekly and monthly** | Period comparisons with delta highlights |
-| 🔔 &nbsp;**Alert history** | Full log of every alert, with timestamps and scores |
+| 📊 &nbsp;**Live gauge** | Current cognitive load score (blended rule-based + ML prediction) |
+| ℹ️ &nbsp;**Interactive Tooltips** | Clicking the `ℹ` popover on any chart toggles detailed explanations and color-coded threshold keys |
+| 📈 &nbsp;**Score trend** | Score history across all sessions with Burnout (80), High (60), and Mild (30) reference bands |
+| 🧩 &nbsp;**Category breakdown** | Stacked bar chart showing Typing, Errors, Context, and Session contributions |
+| 🔴 &nbsp;**Error density** | Spikes and peak compilation errors per 10-minute window |
+| 🔀 &nbsp;**Context switching** | File switch frequency contrasted against rapid-switch lines |
+| 🎯 &nbsp;**Deep work vs. idle** | Focus blocks compared to idle time per session against a 25-minute deep work goal |
+| 🗓️ &nbsp;**Heatmap** | Hourly/daily cognitive load matrix (Hour of day vs Date) |
+| 📅 &nbsp;**Weekly and monthly** | Period comparisons (Weekly/Monthly) with green/pink delta highlights |
+| 🔔 &nbsp;**Alert history** | Detailed alert feed with type-specific glowing borders, local timestamps, messages, and triggered rule tags |
 
 <br/>
 
