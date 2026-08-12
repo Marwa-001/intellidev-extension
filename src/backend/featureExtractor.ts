@@ -20,6 +20,14 @@ export interface FeatureVector {
   longest_deep_work_minutes: number;
   night_time_minutes: number;
   is_night_session: boolean;
+
+  // ── Derived composite signals ────────────────────────────────────────────
+  // Errors relative to typing speed: fast typers with many errors are under
+  // more strain than slow typers with many errors.
+  error_to_type_ratio: number;
+  // Rapid context switches per minute of session — captures fragmentation
+  // regardless of total session length.
+  context_fragmentation: number;
 }
 
 interface SessionEvent {
@@ -148,28 +156,47 @@ export function extractFeatures(session: SessionLog): FeatureVector {
   const context = extractContext(session.events);
   const sess    = extractSession(session);
 
+  const avg_kpm              = round(typing.avg_kpm ?? 0);
+  const avg_error_rate       = round(errors.avg_error_rate ?? 0);
+  const rapid_switch_count   = Math.round(context.rapid_switch_count ?? 0);
+  const session_duration_min = round(sess.session_duration_minutes ?? 0);
+
+  // ── Derived composite signals ────────────────────────────────────────────
+  // How many errors occur per unit of typing speed.
+  // A fast typer with many errors signals much more strain than a slow one.
+  const error_to_type_ratio = round(
+    avg_error_rate / Math.max(avg_kpm, 1)
+  );
+  // Rapid switches per minute of session — normalises for session length.
+  const context_fragmentation = round(
+    rapid_switch_count / Math.max(session_duration_min, 1)
+  );
+
   return {
-    avg_kpm:                   round(typing.avg_kpm ?? 0),
+    avg_kpm,
     typing_variability:        round(typing.typing_variability ?? 0),
     avg_pause_duration_ms:     round(typing.avg_pause_duration_ms ?? 0),
     pause_count:               Math.round(typing.pause_count ?? 0),
     backspace_rate:            round(typing.backspace_rate ?? 0),
 
-    avg_error_rate:            round(errors.avg_error_rate ?? 0),
+    avg_error_rate,
     max_error_rate:            round(errors.max_error_rate ?? 0),
     error_burst_count:         Math.round(errors.error_burst_count ?? 0),
     debug_session_count:       Math.round(errors.debug_session_count ?? 0),
 
     avg_switch_frequency:      round(context.avg_switch_frequency ?? 0),
     max_switch_frequency:      round(context.max_switch_frequency ?? 0),
-    rapid_switch_count:        Math.round(context.rapid_switch_count ?? 0),
+    rapid_switch_count,
     avg_unique_files:          round(context.avg_unique_files ?? 0),
 
-    session_duration_minutes:  round(sess.session_duration_minutes ?? 0),
+    session_duration_minutes:  session_duration_min,
     idle_ratio:                round(sess.idle_ratio ?? 0),
     longest_deep_work_minutes: round(sess.longest_deep_work_minutes ?? 0),
     night_time_minutes:        round(sess.night_time_minutes ?? 0),
     is_night_session:          Boolean(sess.is_night_session),
+
+    error_to_type_ratio,
+    context_fragmentation,
   };
 }
 

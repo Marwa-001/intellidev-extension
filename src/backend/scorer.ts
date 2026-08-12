@@ -55,9 +55,24 @@ export interface ScoringResult {
   category_scores: { typing: number; error: number; context: number; session: number };
   feature_snapshot: Record<string, number | boolean>;
   reading_mode: boolean;   // true when reading/debugging dampening was applied
+  // ── ML enhancement fields (populated by BackendEngine after blending) ──
+  ml_score?:       number;  // raw prediction from the on-device ML model
+  blend_alpha?:    number;  // how much weight the ML score carried (0–1)
+  fatigue_penalty?: number; // extra pts added from cross-session fatigue trend
 }
 
-// ── Reading-mode detection 
+// ── Smooth scoring utility ─────────────────────────────────────────────────────
+
+// Returns score points that grow linearly between `low` and `high`.
+// At or below `low`: 0 pts. At or above `high`: maxPts.
+// Between the thresholds: proportional interpolation (no cliff-edge).
+export function smoothScore(value: number, low: number, high: number, maxPts: number): number {
+  if (value <= low)  { return 0; }
+  if (value >= high) { return maxPts; }
+  return Math.round(maxPts * (value - low) / (high - low));
+}
+
+// ── Reading-mode detection ─────────────────────────────────────────────────
 
 function isReadingMode(f: FeatureVector): boolean {
   return (
@@ -174,6 +189,9 @@ export function computeScore(features: FeatureVector): ScoringResult {
       idle_ratio:                features.idle_ratio,
       longest_deep_work_minutes: features.longest_deep_work_minutes,
       night_time_minutes:        features.night_time_minutes,
+      // Composite signals
+      error_to_type_ratio:       features.error_to_type_ratio,
+      context_fragmentation:     features.context_fragmentation,
     },
     reading_mode: readingMode,
   };

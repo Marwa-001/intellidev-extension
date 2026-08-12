@@ -1,46 +1,55 @@
 import * as vscode from 'vscode';
-import * as fs     from 'fs';
-import * as path   from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import { BaselineManager, FeatureMetrics, ScoredSession } from './Baselinemanager';
 
 // Interfaces
 
 interface FeatureData extends FeatureMetrics {
-  session_id?:           string;
-  datetime?:             string;
-  cognitive_score?:      number;
-  score_label?:          string;
-  typing_score?:         number;
-  error_score?:          number;
-  context_score?:        number;
-  session_score?:        number;
-  baseline_score?:       number | null;
-  baseline_label?:       string | null;
-  deviation_summary?:    string | null;
-  is_calibrating?:       boolean;
+  session_id?: string;
+  datetime?: string;
+  cognitive_score?: number;
+  score_label?: string;
+  typing_score?: number;
+  error_score?: number;
+  context_score?: number;
+  session_score?: number;
+  baseline_score?: number | null;
+  baseline_label?: string | null;
+  deviation_summary?: string | null;
+  is_calibrating?: boolean;
   calibration_progress?: number;
+  // ── ML & Composite Signal Enhancements ────────────────────────────────
+  ml_score?: number | null;
+  blend_alpha?: number | null;
+  fatigue_penalty?: number;
+  rule_score?: number;
+  error_to_type_ratio?: number;
+  context_fragmentation?: number;
+  reading_mode?: boolean;
 }
 
 interface AlertData {
-  alert_id?:    string;
-  timestamp?:   string;
-  session_id?:  string;
-  score?:       number;
+  alert_id?: string;
+  timestamp?: string;
+  session_id?: string;
+  score?: number;
   level_label?: string;
   level_emoji?: string;
-  alert_type?:  string;
-  message?:     string;
+  alert_type?: string;
+  message?: string;
+  triggered_rules?: string[];
 }
 
 interface PeriodStats {
-  label:        string;
-  avgScore:     number;
-  avgKpm:       number;
+  label: string;
+  avgScore: number;
+  avgKpm: number;
   avgErrorRate: number;
-  avgDeepWork:  number;
-  avgSwitches:  number;
+  avgDeepWork: number;
+  avgSwitches: number;
   sessionCount: number;
-  totalHours:   number;
+  totalHours: number;
 }
 
 // Dashboard Provider
@@ -48,27 +57,27 @@ interface PeriodStats {
 export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'intellidev.dashboard';
 
-  private _view?:             vscode.WebviewView;
-  private _refreshInterval?:  NodeJS.Timeout;
+  private _view?: vscode.WebviewView;
+  private _refreshInterval?: NodeJS.Timeout;
   private readonly REFRESH_MS = 30_000;
 
   private readonly _featuresDir: string;
-  private readonly _alertsDir:   string;
+  private readonly _alertsDir: string;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _baseline:     BaselineManager,
-    dataDir:                         string,
+    private readonly _baseline: BaselineManager,
+    dataDir: string,
   ) {
     this._featuresDir = path.join(dataDir, 'features');
-    this._alertsDir   = path.join(dataDir, 'alerts');
+    this._alertsDir = path.join(dataDir, 'alerts');
     this._baseline.setFeaturesDir(this._featuresDir);
   }
 
   resolveWebviewView(
-    webviewView:  vscode.WebviewView,
-    _ctx:         vscode.WebviewViewResolveContext,
-    _token:       vscode.CancellationToken,
+    webviewView: vscode.WebviewView,
+    _ctx: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken,
   ): void {
     this._view = webviewView;
 
@@ -79,11 +88,11 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlContent(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(msg => {
-      if (msg.command === 'ready')             { this._sendData(); }  // webview JS fully loaded
-      if (msg.command === 'refresh')           { this._sendData(); }
+      if (msg.command === 'ready') { this._sendData(); }  // webview JS fully loaded
+      if (msg.command === 'refresh') { this._sendData(); }
       if (msg.command === 'deleteSessionData') { this._handleDelete('sessions'); }
-      if (msg.command === 'resetBaseline')     { this._handleDelete('baseline'); }
-      if (msg.command === 'fullWipe')          { this._handleDelete('full'); }
+      if (msg.command === 'resetBaseline') { this._handleDelete('baseline'); }
+      if (msg.command === 'fullWipe') { this._handleDelete('full'); }
     });
 
     // Also send immediately as a fallback (handles reload/re-focus cases)
@@ -121,23 +130,23 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
   private _buildPeriodStats(features: FeatureData[]): {
     weekly: PeriodStats[]; monthly: PeriodStats[];
   } {
-    const now       = new Date();
-    const startOf   = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const weekMs    = 7 * 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
     const todayStart = startOf(now);
 
     const weekBuckets = Array.from({ length: 4 }, (_, w) => {
-      const to   = todayStart - w * weekMs + (w === 0 ? 86_400_000 : 0);
+      const to = todayStart - w * weekMs + (w === 0 ? 86_400_000 : 0);
       const from = to - weekMs;
-      const lbl  = w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`;
+      const lbl = w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`;
       return { label: lbl, from, to };
     });
 
     const monthBuckets = Array.from({ length: 3 }, (_, m) => {
-      const d    = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
       const from = d.getTime();
-      const to   = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
-      const lbl  = m === 0 ? 'This Month'
+      const to = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+      const lbl = m === 0 ? 'This Month'
         : d.toLocaleString('default', { month: 'short', year: '2-digit' });
       return { label: lbl, from, to };
     });
@@ -153,21 +162,21 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
       const avg = (key: keyof FeatureData) =>
         inBucket.reduce((a, f) => a + ((f[key] as number) || 0), 0) / inBucket.length;
       return {
-        label:        bucket.label,
-        avgScore:     Math.round(avg('cognitive_score')),
-        avgKpm:       Math.round(avg('avg_kpm')),
+        label: bucket.label,
+        avgScore: Math.round(avg('cognitive_score')),
+        avgKpm: Math.round(avg('avg_kpm')),
         avgErrorRate: parseFloat(avg('avg_error_rate').toFixed(1)),
-        avgDeepWork:  Math.round(avg('longest_deep_work_minutes')),
-        avgSwitches:  parseFloat(avg('avg_switch_frequency').toFixed(1)),
+        avgDeepWork: Math.round(avg('longest_deep_work_minutes')),
+        avgSwitches: parseFloat(avg('avg_switch_frequency').toFixed(1)),
         sessionCount: inBucket.length,
-        totalHours:   parseFloat(
+        totalHours: parseFloat(
           (inBucket.reduce((a, f) => a + (f.session_duration_minutes ?? 0), 0) / 60).toFixed(1)
         ),
       };
     };
 
     return {
-      weekly:  weekBuckets.map(aggregate).filter(p => p.sessionCount > 0),
+      weekly: weekBuckets.map(aggregate).filter(p => p.sessionCount > 0),
       monthly: monthBuckets.map(aggregate).filter(p => p.sessionCount > 0),
     };
   }
@@ -187,13 +196,13 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
             fs.readFileSync(path.join(this._featuresDir, file), 'utf-8')
           ) as FeatureData;
 
-          const sid     = file.replace('_features.json', '');
+          const sid = file.replace('_features.json', '');
           data.session_id = sid;
 
           try {
-            const p         = sid.replace('session_', '');
-            const [dp, tp]  = p.split('_');
-            data.datetime   = new Date(
+            const p = sid.replace('session_', '');
+            const [dp, tp] = p.split('_');
+            data.datetime = new Date(
               parseInt(dp.slice(0, 4)),
               parseInt(dp.slice(4, 6)) - 1,
               parseInt(dp.slice(6, 8)),
@@ -206,11 +215,11 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
           }
 
           if (data.cognitive_score === undefined) { data.cognitive_score = 0; }
-          if (data.score_label     === undefined) { data.score_label     = this._rawLabel(0); }
-          if (data.typing_score    === undefined) { data.typing_score    = 0; }
-          if (data.error_score     === undefined) { data.error_score     = 0; }
-          if (data.context_score   === undefined) { data.context_score   = 0; }
-          if (data.session_score   === undefined) { data.session_score   = 0; }
+          if (data.score_label === undefined) { data.score_label = this._rawLabel(0); }
+          if (data.typing_score === undefined) { data.typing_score = 0; }
+          if (data.error_score === undefined) { data.error_score = 0; }
+          if (data.context_score === undefined) { data.context_score = 0; }
+          if (data.session_score === undefined) { data.session_score = 0; }
 
           raw.push(data);
         } catch { /* skip malformed file */ }
@@ -236,10 +245,10 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
       const scored: ScoredSession = this._baseline.scoreSession(
         this._toMetrics(f), f.cognitive_score ?? 0
       );
-      f.baseline_score       = scored.baselineScore;
-      f.baseline_label       = scored.baselineLabel;
-      f.deviation_summary    = scored.deviationSummary;
-      f.is_calibrating       = scored.isCalibrating;
+      f.baseline_score = scored.baselineScore;
+      f.baseline_label = scored.baselineLabel;
+      f.deviation_summary = scored.deviationSummary;
+      f.is_calibrating = scored.isCalibrating;
       f.calibration_progress = scored.calibrationProgress;
       return f;
     });
@@ -247,21 +256,21 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
 
   private _toMetrics(f: FeatureData): FeatureMetrics {
     return {
-      avg_kpm:                   f.avg_kpm                   ?? 0,
-      typing_variability:        f.typing_variability        ?? 0,
-      backspace_rate:            f.backspace_rate            ?? 0,
-      pause_count:               f.pause_count               ?? 0,
-      avg_error_rate:            f.avg_error_rate            ?? 0,
-      max_error_rate:            f.max_error_rate            ?? 0,
-      error_burst_count:         f.error_burst_count         ?? 0,
-      debug_session_count:       f.debug_session_count       ?? 0,
-      avg_switch_frequency:      f.avg_switch_frequency      ?? 0,
-      rapid_switch_count:        f.rapid_switch_count        ?? 0,
-      avg_unique_files:          f.avg_unique_files          ?? 0,
-      session_duration_minutes:  f.session_duration_minutes  ?? 0,
-      idle_ratio:                f.idle_ratio                ?? 0,
+      avg_kpm: f.avg_kpm ?? 0,
+      typing_variability: f.typing_variability ?? 0,
+      backspace_rate: f.backspace_rate ?? 0,
+      pause_count: f.pause_count ?? 0,
+      avg_error_rate: f.avg_error_rate ?? 0,
+      max_error_rate: f.max_error_rate ?? 0,
+      error_burst_count: f.error_burst_count ?? 0,
+      debug_session_count: f.debug_session_count ?? 0,
+      avg_switch_frequency: f.avg_switch_frequency ?? 0,
+      rapid_switch_count: f.rapid_switch_count ?? 0,
+      avg_unique_files: f.avg_unique_files ?? 0,
+      session_duration_minutes: f.session_duration_minutes ?? 0,
+      idle_ratio: f.idle_ratio ?? 0,
       longest_deep_work_minutes: f.longest_deep_work_minutes ?? 0,
-      night_time_minutes:        f.night_time_minutes        ?? 0,
+      night_time_minutes: f.night_time_minutes ?? 0,
     };
   }
 
@@ -296,22 +305,22 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
     if (!this._view) { return; }
 
     try {
-      const features     = this._loadFeatures();
-      const alerts       = this._loadAlerts();
-      const periodStats  = this._buildPeriodStats(features);
+      const features = this._loadFeatures();
+      const alerts = this._loadAlerts();
+      const periodStats = this._buildPeriodStats(features);
       const baselineInfo = {
-        isCalibrated:        this._baseline.isCalibrated,
+        isCalibrated: this._baseline.isCalibrated,
         calibrationSessions: this._baseline.calibrationSessions,
-        calibrationHours:    Math.round(this._baseline.calibrationHours * 10) / 10,
+        calibrationHours: Math.round(this._baseline.calibrationHours * 10) / 10,
         calibrationProgress: Math.round(this._baseline.calibrationProgress * 100),
-        minSessions:         this._baseline.minSessions,
-        minHours:            this._baseline.minHours,
-        baselineLockedAt:    this._baseline.baseline?.lockedAt    ?? null,
-        baselineUpdatedAt:   this._baseline.baseline?.lastUpdatedAt ?? null,
+        minSessions: this._baseline.minSessions,
+        minHours: this._baseline.minHours,
+        baselineLockedAt: this._baseline.baseline?.lockedAt ?? null,
+        baselineUpdatedAt: this._baseline.baseline?.lastUpdatedAt ?? null,
       };
 
       this._view.webview.postMessage({
-        command:     'update',
+        command: 'update',
         features,
         alerts,
         baselineInfo,
@@ -336,7 +345,7 @@ export class IntelliDevDashboardProvider implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <style nonce="${nonce}">
-:root{--teal:#00B4D8;--pink:#FF4B7D;--orange:#FF8C42;--green:#1ABC9C;--yellow:#F39C12;--red:#E74C3C;--border:rgba(0,180,216,.2)}
+:root{--teal:#00B4D8;--pink:#FF4B7D;--orange:#FF8C42;--green:#1ABC9C;--yellow:#F39C12;--red:#E74C3C;--purple:#C160EF;--border:rgba(0,180,216,.2)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:var(--vscode-sideBar-background,#0D1117);overflow-x:hidden}
 
@@ -375,11 +384,18 @@ body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:v
 
 .baseline-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(26,188,156,.15);border:1px solid rgba(26,188,156,.35);font-size:9px;color:var(--green);font-weight:600;margin:0 10px 6px;text-transform:uppercase;letter-spacing:.07em}
 
+/* ML Engine badge */
+.ml-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(193,96,239,.15);border:1px solid rgba(193,96,239,.35);font-size:9px;color:var(--purple);font-weight:600;margin:0 10px 6px;text-transform:uppercase;letter-spacing:.07em}
+
+/* Fatigue penalty badge */
+.fatigue-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.35);font-size:9px;color:var(--red);font-weight:600;margin:0 10px 6px}
+
 /* Reading-mode chip */
 .reading-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;background:rgba(0,180,216,.1);border:1px solid rgba(0,180,216,.3);font-size:9px;color:var(--teal);font-weight:600;margin:0 10px 6px}
 
 .mcards{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:0 10px 6px}
-.mc{background:var(--vscode-editor-background,#161B22);border:1px solid var(--border);border-radius:6px;padding:8px 10px;position:relative;overflow:hidden}
+.mc{background:var(--vscode-editor-background,#161B22);border:1px solid var(--border);border-radius:6px;padding:8px 10px;position:relative;overflow:hidden;transition:border-color .2s}
+.mc:hover{border-color:var(--teal)}
 .mc::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:var(--teal)}
 .mc-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#8B949E;margin-bottom:4px}
 .mc-val{font-size:15px;font-weight:700;color:var(--teal);font-family:monospace}
@@ -403,11 +419,20 @@ body{font-family:'Segoe UI',sans-serif;font-size:12px;color:#C9D1D9;background:v
 .hmleg{display:flex;align-items:center;gap:4px;padding:4px 0 0;font-size:9px;color:#8B949E}
 .hmgrad{flex:1;height:5px;border-radius:3px;background:linear-gradient(90deg,#1a3a2a,#1ABC9C,#F39C12,#FF8C42,#FF4B7D)}
 
-.alist{padding:0 10px 12px;display:flex;flex-direction:column;gap:4px}
-.aitem{padding:6px 8px;border-radius:4px;background:var(--vscode-editor-background,#161B22);border-left:3px solid transparent;font-size:10px;line-height:1.5}
-.aitem.burnout_risk{border-left-color:var(--red)}.aitem.overload{border-left-color:var(--orange)}
-.aitem.long_session{border-left-color:var(--yellow)}.aitem.night_warning{border-left-color:#9B59B6}
-.ameta{font-size:9px;color:#8B949E;margin-top:1px}
+.alist{padding:0 10px 12px;display:flex;flex-direction:column;gap:6px}
+.aitem{padding:8px 10px;border-radius:6px;background:var(--vscode-editor-background,#161B22);border:1px solid var(--border);border-left:3px solid transparent;font-size:10px;line-height:1.5;transition:transform .15s,border-color .15s}
+.aitem:hover{transform:translateX(2px)}
+.aitem.burnout_risk{border-left-color:var(--pink);background:rgba(255,75,125,.04);border-color:rgba(255,75,125,.25)}
+.aitem.overload{border-left-color:var(--orange);background:rgba(255,140,66,.04);border-color:rgba(255,140,66,.25)}
+.aitem.long_session{border-left-color:var(--yellow);background:rgba(243,156,18,.04);border-color:rgba(243,156,18,.25)}
+.aitem.night_warning{border-left-color:var(--purple);background:rgba(193,96,239,.04);border-color:rgba(193,96,239,.25)}
+.aitem-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.aitem-title{font-weight:700;font-size:10px;color:#E6EDF3;display:flex;align-items:center;gap:4px}
+.aitem-score{font-family:monospace;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.06)}
+.ameta{font-size:9px;color:#8B949E;margin-bottom:4px}
+.amsg{color:#C9D1D9;font-size:10px;line-height:1.45}
+.arules{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.arule-tag{font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(0,180,216,.1);color:var(--teal);border:1px solid rgba(0,180,216,.25);text-transform:lowercase}
 .noalerts{font-size:11px;color:#8B949E;padding:4px 10px 12px}
 
 .period-tabs{display:flex;gap:4px;padding:0 10px 8px}
@@ -919,13 +944,8 @@ window.addEventListener('message', ev => {
   const displayScore = (!isCalibrating && lat.baseline_score!=null) ? lat.baseline_score : (lat.cognitive_score||0);
   const displayLabel = (!isCalibrating && lat.baseline_label) ? lat.baseline_label : (lat.score_label||'Unknown');
 
-  const avgRaw=(features.reduce((a,f)=>a+(f.cognitive_score||0),0)/features.length).toFixed(1);
-  const avgBaseline=bi.isCalibrated
-    ? (features.filter(f=>f.baseline_score!=null).reduce((a,f)=>a+(f.baseline_score||0),0)/Math.max(1,features.filter(f=>f.baseline_score!=null).length)).toFixed(1)
-    : null;
   const highLoad=features.filter(f=>(f.cognitive_score||0)>=60).length;
   const totalHours=(features.reduce((a,f)=>a+(f.session_duration_minutes||0),0)/60).toFixed(1);
-  const kpm=Math.round(lat.avg_kpm||0);
   const xL=(features[0].datetime||'').slice(5,10), xR=(lat.datetime||'').slice(5,10);
 
   let devChipHtml='';
@@ -943,12 +963,47 @@ window.addEventListener('message', ev => {
 
   let alertHtml='<div class="noalerts">✅ No alerts in this period.</div>';
   if(alerts.length){
-    alertHtml='<div class="alist">'+alerts.slice().reverse().slice(0,6).map(a=>{
-      const tl=(a.alert_type||'').replace(/_/g,' '), ts=(a.timestamp||'').slice(11,16);
-      const m=(a.message||'').slice(0,90)+((a.message||'').length>90?'…':'');
-      return \`<div class="aitem \${a.alert_type||''}"><strong>\${a.level_emoji||'🔔'} \${tl}</strong><div class="ameta">\${ts} · Score \${Math.round(a.score||0)}/100</div><div style="margin-top:2px">\${m}</div></div>\`;
+    alertHtml='<div class="alist">'+alerts.slice().reverse().slice(0,8).map(a=>{
+      const typeLabels = {
+        burnout_risk: 'Burnout Risk',
+        overload: 'Cognitive Overload',
+        long_session: 'Extended Session',
+        night_warning: 'Late-Night Activity'
+      };
+      const typeEmojis = {
+        burnout_risk: '🚨',
+        overload: '⚡',
+        long_session: '⏳',
+        night_warning: '🌙'
+      };
+      const typeKey = a.alert_type || '';
+      const label = typeLabels[typeKey] || typeKey.replace(/_/g,' ');
+      const emoji = typeEmojis[typeKey] || a.level_emoji || '🔔';
+      const ts = (a.timestamp || '').slice(0, 16).replace('T', ' ');
+      const rules = (a.triggered_rules || []).slice(0, 3).map(r => \`<span class="arule-tag">\${r.replace(/_/g, ' ')}</span>\`).join('');
+      const scoreVal = Math.round(a.score || 0);
+      return \`<div class="aitem \${typeKey}">
+        <div class="aitem-hdr">
+          <span class="aitem-title">\${emoji} \${label}</span>
+          <span class="aitem-score" style="color:\${scoreColor(scoreVal)}">\${scoreVal}/100</span>
+        </div>
+        <div class="ameta">🕒 \${ts}</div>
+        <div class="amsg">\${a.message || ''}</div>
+        \${rules ? \`<div class="arules">\${rules}</div>\` : ''}
+      </div>\`;
     }).join('')+'</div>';
   }
+
+  const mlAlpha = lat.blend_alpha ? Math.round(lat.blend_alpha * 100) : 0;
+  const mlBadgeHtml = mlAlpha > 0
+    ? \`<div class="ml-badge">🤖 ML Model Active · \${mlAlpha}% Weight</div>\`
+    : features.length >= 15
+      ? \`<div class="ml-badge">🤖 ML Model Active · Calibrating</div>\`
+      : \`<div class="ml-badge" style="opacity:.7">🤖 ML Engine Training (\${features.length}/15 sessions)</div>\`;
+
+  const fatigueBadgeHtml = lat.fatigue_penalty && lat.fatigue_penalty > 0
+    ? \`<div class="fatigue-badge">⚠️ Temporal Fatigue Penalty +\${lat.fatigue_penalty}pts</div>\`
+    : '';
 
   const calibBanner = isCalibrating ? \`
     <div class="calib-banner">
@@ -970,19 +1025,19 @@ window.addEventListener('message', ev => {
 
   document.getElementById('content').innerHTML = \`
     \${calibBanner}
+    \${mlBadgeHtml}
+    \${fatigueBadgeHtml}
     \${devChipHtml}
     \${readingChipHtml}
     <div class="sec">Overview</div>
     <div class="mcards">
-      <div class="mc"><div class="mc-lbl">Current Score</div><div class="mc-val" style="color:\${scoreColor(displayScore)}">\${displayScore}/100</div><div class="mc-sub">\${isCalibrating?'rule-based':'personalised'}</div></div>
+      <div class="mc"><div class="mc-lbl">Current Score</div><div class="mc-val" style="color:\${scoreColor(displayScore)}">\${displayScore}/100</div><div class="mc-sub">\${mlAlpha > 0 ? \`hybrid (\${mlAlpha}% ML)\` : isCalibrating ? 'rule-based' : 'personalised'}</div></div>
       <div class="mc"><div class="mc-lbl">Status</div><div class="mc-val" style="color:\${scoreColor(displayScore)}">\${displayLabel}</div></div>
-      <div class="mc"><div class="mc-lbl">Session Avg</div><div class="mc-val">\${avgBaseline||avgRaw}</div><div class="mc-sub">\${avgBaseline?'personalised':'rule-based'}</div></div>
+      <div class="mc"><div class="mc-lbl">Rule Score</div><div class="mc-val">\${lat.rule_score ?? lat.cognitive_score ?? 0}</div><div class="mc-sub">20-rule engine</div></div>
+      <div class="mc"><div class="mc-lbl">ML Model</div><div class="mc-val" style="color:\${lat.ml_score != null ? '#C160EF' : '#8B949E'}">\${lat.ml_score != null ? \`\${lat.ml_score}\` : 'learning'}</div><div class="mc-sub">\${mlAlpha > 0 ? \`\${mlAlpha}% weight\` : \`< 15 sessions\`}</div></div>
       <div class="mc"><div class="mc-lbl">High Load</div><div class="mc-val">\${highLoad}/\${features.length}</div><div class="mc-sub">sessions ≥60</div></div>
-      <div class="mc"><div class="mc-lbl">KPM</div><div class="mc-val">\${kpm}</div><div class="mc-sub">keystrokes/min</div></div>
       <div class="mc"><div class="mc-lbl">Total Hours</div><div class="mc-val">\${totalHours}h</div><div class="mc-sub">this device</div></div>
     </div>
-    <div class="sec">Current Cognitive Load</div>
-    <div class="gauge-wrap"><canvas id="c_gauge"></canvas></div>
     \${secHtml('Score Trend', 'trend')}
     \${infoPopHtml('trend')}
     <div class="cw"><canvas id="c_trend"></canvas>

@@ -4,8 +4,10 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 import { extractFeatures, FeatureVector } from './featureExtractor';
-import { computeScore, ScoringResult }    from './scorer';
-import { AlertGenerator, Alert } from './alertGenerator';
+import { computeScore, getScoreLevel, ScoringResult } from './scorer';
+import { AlertGenerator, Alert }          from './alertGenerator';
+import { MLScorer }                       from './mlScorer';
+import { TemporalAnalyser }               from './temporalAnalyser';
 
 // ── Types 
 export interface BackendEngineOptions {
@@ -27,11 +29,13 @@ export class BackendEngine implements vscode.Disposable {
   private readonly onAlert?:    (a: Alert) => void;
   private readonly onScored?:   (id: string, r: ScoringResult) => void;
 
-  private readonly alertGen:    AlertGenerator;
-  private readonly processed:   Set<string> = new Set();
-  private watcher?:             fs.FSWatcher;
-  private debounceMap:          Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private readonly DEBOUNCE_MS  = 15_000;
+  private readonly alertGen:          AlertGenerator;
+  private readonly mlScorer:          MLScorer;
+  private readonly temporalAnalyser:  TemporalAnalyser;
+  private readonly processed:         Set<string> = new Set();
+  private watcher?:                   fs.FSWatcher;
+  private debounceMap:                Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private readonly DEBOUNCE_MS = 15_000;
 
   private scoringHistory: Array<{ timestamp: string; session_id: string; score: number; level: string }> = [];
 
@@ -43,6 +47,11 @@ export class BackendEngine implements vscode.Disposable {
     this.onAlert     = opts.onAlert;
     this.onScored    = opts.onScored;
     this.alertGen    = new AlertGenerator(opts.cooldownMs ?? 300_000);
+
+    // Derive data root from featuresDir (e.g. .../intellidev/features -> .../intellidev)
+    const dataDir = path.dirname(opts.featuresDir);
+    this.mlScorer         = new MLScorer(dataDir);
+    this.temporalAnalyser = new TemporalAnalyser(dataDir);
 
     fs.mkdirSync(this.featuresDir, { recursive: true });
     fs.mkdirSync(this.alertsDir,   { recursive: true });
@@ -101,24 +110,69 @@ export class BackendEngine implements vscode.Disposable {
       return null;
     }
 
-    const result    = computeScore(features);
-    const sessionId = session.sessionId;
+    // ── Step 1: Rule-based scoring (always runs; primary signal) ─────────
+    const ruleResult = computeScore(features);
+    const ruleScore  = ruleResult.capped_score;
 
-    // ── Persist features JSON ────────────────────────────────────────────────
-    // Include score fields + reading_mode so dashboardProvider can read them
-    // directly without recomputing.
+    // ── Step 2: ML scoring (blended in gradually) ────────────────────────
+    const rawFeatures = features as unknown as Record<string, number | boolean>;
+    const mlScore     = this.mlScorer.predict(rawFeatures);
+    const blendAlpha  = this._getBlendAlpha();
+
+    const blendedScore = (mlScore >= 0 && blendAlpha > 0)
+      ? Math.round((1 - blendAlpha) * ruleScore + blendAlpha * mlScore)
+      : ruleScore;
+
+    // ── Step 3: Temporal fatigue penalty ─────────────────────────────────
+    const fatiguePenalty = this.temporalAnalyser.getFatiguePenalty();
+    const finalScore     = Math.min(100, blendedScore + fatiguePenalty);
+    const finalLevel     = getScoreLevel(finalScore);
+
+    // ── Step 4: Build final ScoringResult ────────────────────────────────
+    const result: ScoringResult = {
+      ...ruleResult,
+      capped_score:    finalScore,
+      level:           finalLevel,
+      ml_score:        mlScore >= 0 ? mlScore : undefined,
+      blend_alpha:     blendAlpha,
+      fatigue_penalty: fatiguePenalty,
+    };
+
+    // ── Step 5: Train ML model on this session ────────────────────────────
+    //   Label is derived automatically from the rule score:
+    //     >=80  → 1.0  (definite high load)
+    //     >=60  → 0.7  (elevated load)
+    //     >=30  → 0.3  (mild load)
+    //     < 30  → 0.0  (normal)
+    const mlLabel =
+      ruleScore >= 80 ? 1.0 :
+      ruleScore >= 60 ? 0.7 :
+      ruleScore >= 30 ? 0.3 : 0.0;
+    this.mlScorer.update(rawFeatures, mlLabel);
+
+    // ── Step 6: Record in temporal analyser ──────────────────────────────
+    const sessionId = session.sessionId!;
+    this.temporalAnalyser.record(sessionId, finalScore, finalLevel.label);
+
+    // ── Step 7: Persist features + all score variants ─────────────────────
     const featPath = path.join(this.featuresDir, `${sessionId}_features.json`);
     try {
       const featuresWithScore = {
         ...features,
+        // Final blended + temporal score (what the dashboard shows)
         cognitive_score:  result.capped_score,
         score_label:      result.level.label,
-        typing_score:     result.category_scores.typing,
-        error_score:      result.category_scores.error,
-        context_score:    result.category_scores.context,
-        session_score:    result.category_scores.session,
-        // v0.1.5: reading_mode flag for dashboard chip
-        reading_mode:     result.reading_mode,
+        // Rule engine breakdown (unchanged)
+        rule_score:       ruleScore,
+        typing_score:     ruleResult.category_scores.typing,
+        error_score:      ruleResult.category_scores.error,
+        context_score:    ruleResult.category_scores.context,
+        session_score:    ruleResult.category_scores.session,
+        reading_mode:     ruleResult.reading_mode,
+        // ML layer info
+        ml_score:         mlScore >= 0 ? mlScore : null,
+        fatigue_penalty:  fatiguePenalty,
+        blend_alpha:      blendAlpha,
       };
       fs.writeFileSync(featPath, JSON.stringify(featuresWithScore, null, 2), 'utf-8');
     } catch (e) {
@@ -144,13 +198,27 @@ export class BackendEngine implements vscode.Disposable {
 
     this.onScored?.(sessionId, result);
 
-    const readingNote = result.reading_mode ? ' [reading mode — context dampened]' : '';
+    const readingNote = result.reading_mode
+      ? ' [reading mode — context dampened]' : '';
+    const mlNote = mlScore >= 0 && blendAlpha > 0
+      ? ` [ML blend ${Math.round(blendAlpha * 100)}%, ml=${mlScore}]` : '';
+    const fatigueNote = fatiguePenalty > 0
+      ? ` [fatigue +${fatiguePenalty}pts]` : '';
     console.log(
       `[IntelliDev Engine] Scored ${sessionId}: ` +
-      `${result.level.emoji} ${result.level.label} (${result.capped_score.toFixed(1)}/100)${readingNote}`
+      `${result.level.emoji} ${result.level.label} (${result.capped_score.toFixed(1)}/100)` +
+      `${readingNote}${mlNote}${fatigueNote}`
     );
 
     return result;
+  }
+
+  // ── Returns the blend weight for ML score (ramps from 0 to MAX_ALPHA) ──
+  private _getBlendAlpha(): number {
+    if (!this.mlScorer.isReady) { return 0; }
+    const RAMP_SESSIONS = 50;
+    const progress = (this.mlScorer.sessionCount - MLScorer.MIN_SESSIONS) / RAMP_SESSIONS;
+    return Math.min(MLScorer.MAX_BLEND_ALPHA, progress * MLScorer.MAX_BLEND_ALPHA);
   }
 
   private _processExisting(): void {
