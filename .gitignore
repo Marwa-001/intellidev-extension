@@ -4,6 +4,5 @@ node_modules
 .vscode-test/
 *.vsix
 venv/
-.vscode/
 *.log
 config.bat
